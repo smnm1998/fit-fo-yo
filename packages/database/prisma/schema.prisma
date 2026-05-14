@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum RecordType {
+  DIET
+  EXERCISE
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String?  @unique
+  passwordHash String?
+  nickname     String?
+  isGuest      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  records         Record[]
+  recommendations Recommendation[]
+
+  @@index([isGuest, createdAt])
+}
+
+model Record {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       RecordType
+  rawInput   String     @db.Text
+  parsedJson Json
+  recordedAt DateTime
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  dietItems     DietItem[]
+  exerciseItems ExerciseItem[]
+
+  @@index([userId, recordedAt])
+  @@index([userId, type, recordedAt])
+}
+
+model DietItem {
+  id        String    @id @default(cuid())
+  recordId  String
+  record    Record    @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  name      String
+  mealType  MealType?
+  quantity  Float?
+  unit      String?
+  calories  Int?
+  carbs     Float?
+  protein   Float?
+  fat       Float?
+  createdAt DateTime  @default(now())
+
+  @@index([recordId])
+}
+
+model ExerciseItem {
+  id              String   @id @default(cuid())
+  recordId        String
+  record          Record   @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  name            String
+  durationMinutes Int?
+  intensity       String?
+  caloriesBurned  Int?
+  createdAt       DateTime @default(now())
+
+  @@index([recordId])
+}
+
+model Recommendation {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  forDate   DateTime @db.Date
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@unique([userId, forDate])
+  @@index([userId, forDate])
+}
