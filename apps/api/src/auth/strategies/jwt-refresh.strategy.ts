@@ -6,6 +6,12 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PasswordService } from '../password.service';
 
+type RefreshValidateResult = {
+  id: string;
+  isGuest: boolean;
+  refreshToken: string;
+};
+
 export type RefreshTokenPayload = {
   sub: string;
 };
@@ -27,7 +33,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     });
   }
 
-  async validate(req: Request, payload: RefreshTokenPayload) {
+  async validate(req: Request, payload: RefreshTokenPayload): Promise<RefreshValidateResult> {
     const refreshToken = req.cookies?.refresh_token as string | undefined;
     if (!refreshToken) throw new UnauthorizedException();
 

@@ -4,6 +4,9 @@ import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from 'src/prisma/prisma.service';
+import type { User } from '@fitfoyo/database';
+
+type AccessUserSummary = Pick<User, 'id' | 'email' | 'nickname' | 'isGuest'>;
 
 export type AccessTokenPayload = {
   sub: string; // userId
@@ -25,7 +28,7 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
     });
   }
 
-  async validate(payload: AccessTokenPayload) {
+  async validate(payload: AccessTokenPayload): Promise<AccessUserSummary> {
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, nickname: true, isGuest: true },

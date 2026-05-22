@@ -84,7 +84,12 @@ export class AuthService {
     const tokens = await this.issueTokens(user.id, user.isGuest);
     await this.persistRefreshHash(user.id, tokens.refreshToken);
 
-    const { passwordHash: _ph, ...safeUser } = user;
+    const safeUser: AuthUser = {
+      id: user.id,
+      email: user.email,
+      nickname: user.nickname,
+      isGuest: user.isGuest,
+    };
     return { user: safeUser, tokens };
   }
 
@@ -168,9 +173,10 @@ export class AuthService {
       { sub: userId },
       {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.config.get<StringValue>('JWT_REFRESH_EXPIRES_IN', '7d'),
+        expiresIn: this.config.get<StringValue>('JWT_REFRESH_EXPIRES_IN') ?? '7d',
       },
     );
+
     return { accessToken, refreshToken };
   }
 
