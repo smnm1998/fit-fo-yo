@@ -39,3 +39,7 @@ yarn-error.log*
 
 # claude
 .claude
+
+# Test artifacts
+cookies.txt
+*_cookies.txt
