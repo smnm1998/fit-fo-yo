@@ -1,10 +1,10 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
-import bcrypt from 'bcrypt';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PasswordService } from '../password.service';
 
 export type RefreshTokenPayload = {
   sub: string;
@@ -15,6 +15,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
   constructor(
     config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly password: PasswordService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -37,7 +38,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
     if (!user?.refreshTokenHash) throw new UnauthorizedException('Token revoked');
 
-    const isValid = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+    const isValid = await this.password.compare(refreshToken, user.refreshTokenHash);
     if (!isValid) throw new UnauthorizedException('Token mismatch');
 
     return {
