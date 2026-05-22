@@ -21,7 +21,10 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req: Request) => req.cookies?.access_token ?? null,
+        (req: Request): string | null => {
+          const cookies = req.cookies as Record<string, string | undefined> | undefined;
+          return cookies?.access_token ?? null;
+        },
       ]),
       ignoreExpiration: false,
       secretOrKey: config.getOrThrow<string>('JWT_SECRET'),
@@ -29,10 +32,10 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, 'jwt-access') 
   }
 
   async validate(payload: AccessTokenPayload): Promise<AccessUserSummary> {
-    const user = await this.prisma.user.findUnique({
+    const user = (await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: { id: true, email: true, nickname: true, isGuest: true },
-    });
+    })) as AccessUserSummary | null;
     if (!user) throw new UnauthorizedException();
     return user;
   }
