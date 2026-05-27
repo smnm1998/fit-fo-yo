@@ -34,10 +34,11 @@ export class RecordsService {
         : {}),
     };
 
-    return this.prisma.record.create({
+    const record = await this.prisma.record.create({
       data,
       include: { dietItems: true, exerciseItems: true },
     });
+    return record;
   }
 
   async createFromParsed(params: {
@@ -49,7 +50,7 @@ export class RecordsService {
     dietItems?: Prisma.DietItemCreateWithoutRecordInput[];
     exerciseItems?: Prisma.ExerciseItemCreateWithoutRecordInput[];
   }) {
-    return this.prisma.record.create({
+    const record = await this.prisma.record.create({
       data: {
         user: { connect: { id: params.userId } },
         type: params.type,
@@ -63,6 +64,7 @@ export class RecordsService {
       },
       include: { dietItems: true, exerciseItems: true },
     });
+    return record;
   }
 
   async findAll(userId: string, query: QueryRecordsDto) {
