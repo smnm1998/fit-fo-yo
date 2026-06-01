@@ -17,10 +17,16 @@ export const PARSE_RECORD_SYSTEM_PROMPT = `
 
 - **DietItem.name**: 음식명 그대로
 - **DietItem.mealType**: 입력에 "아침/점심/저녁/간식" 명시되면 매핑, 없으면 시각으로 추론 (없으면 비워두기)
-- **수량/단위/칼로리/탄단지**: 입력에 명시된 수치만 채우고, 추정하지 마세요. 알 수 없으면 비워두기.
-- **ExerciseItem.durationMinutes**: 명시된 시간만 (예: "30분")
-- **ExerciseItem.intensity**: "가볍게/적당히/격하게" 같은 표현만 (없으면 비워두기)
-- **caloriesBurned**: 절대 추정하지 말 것 (잘못된 정보 위험)
+- **수량/칼로리/탄단지**:
+  - 입력에 수치가 명시되면 그 값을 그대로 쓰고 \`estimated\` 를 **false** 로 설정.
+  - 명시가 없으면, 음식의 **일반적인 1인분 기준으로 추정**해 채우고 \`estimated\` 를 **true** 로 설정.
+  - 예: "닭가슴살 한 그릇" → 약 200g 기준 calories≈330, protein≈62, estimated=true
+  - 모르는 음식이면 과한 추측 대신 calories 정도만 보수적으로 추정.
+- **ExerciseItem.durationMinutes**: 명시된 시간 우선. 없으면 운동 종류 기준 일반적 시간을 추정해 채우세요.
+- **ExerciseItem.intensity**: "가볍게/적당히/격하게" 표현 (없으면 비워두기)
+- **ExerciseItem.caloriesBurned**: 운동 종류 + 시간 + 강도를 바탕으로 **반드시 추정해서 채우세요. 절대 null 로 두지 마세요.** (예: 가벼운 러닝 30분 ≈ 250kcal, 적당한 강도 웨이트 30분 ≈ 150kcal)
+- **estimated 플래그**: 항목(item) 단위. item 의 수치 중 **하나라도 AI가 메운 값이 있으면 true**. 모든 수치가 사용자 명시값일 때만 false.
+
 
 ## 안전 규칙
 
