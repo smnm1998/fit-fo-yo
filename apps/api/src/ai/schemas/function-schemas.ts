@@ -15,8 +15,12 @@ const dietItemSchema = {
     carbs: { type: 'number', description: '탄수화물 (g)' },
     protein: { type: 'number', description: '단백질 (g)' },
     fat: { type: 'number', description: '지방 (g)' },
+    estimated: {
+      type: 'boolean',
+      description: 'AI가 추정한 값이면 true, 사용자가 명시한 값 기반이면 false',
+    },
   },
-  required: ['name'],
+  required: ['name', 'estimated'],
   additionalProperties: false,
 } as const;
 
@@ -25,13 +29,14 @@ const exerciseItemSchema = {
   properties: {
     name: { type: 'string', description: '운동명' },
     durationMinutes: { type: 'integer', description: '운동 시간 (분)' },
-    intensity: {
-      type: 'string',
-      description: '강도 (예: 가볍게, 적당히, 격하게)',
-    },
+    intensity: { type: 'string', description: '강도 (예: 가볍게, 적당히, 격하게)' },
     caloriesBurned: { type: 'integer', description: '소모 칼로리 (kcal)' },
+    estimated: {
+      type: 'boolean',
+      description: 'AI가 추정한 값이면 true, 사용자가 명시한 값 기반이면 false',
+    },
   },
-  required: ['name'],
+  required: ['name', 'estimated'],
   additionalProperties: false,
 } as const;
 
@@ -114,6 +119,7 @@ export type ParsedDietPayload = {
     carbs?: number;
     protein?: number;
     fat?: number;
+    estimated: boolean;
   }>;
   recordedAt?: string;
 };
@@ -124,6 +130,7 @@ export type ParsedExercisePayload = {
     durationMinutes?: number;
     intensity?: string;
     caloriesBurned?: number;
+    estimated: boolean;
   }>;
   recordedAt?: string;
 };
