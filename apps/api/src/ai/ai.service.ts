@@ -96,6 +96,7 @@ export class AiService {
           carbs: item.carbs,
           protein: item.protein,
           fat: item.fat,
+          estimated: item.estimated,
         })),
       });
     }
@@ -111,6 +112,7 @@ export class AiService {
         durationMinutes: item.durationMinutes,
         intensity: item.intensity,
         caloriesBurned: item.caloriesBurned,
+        estimated: item.estimated,
       })),
     });
   }

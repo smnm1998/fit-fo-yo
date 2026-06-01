@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsInt,
@@ -51,6 +52,10 @@ export class DietItemInputDto {
   @IsNumber()
   @Min(0)
   fat?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  estimated?: boolean;
 }
 
 export class ExerciseItemInputDto {
@@ -72,6 +77,10 @@ export class ExerciseItemInputDto {
   @IsInt()
   @Min(0)
   caloriesBurned?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  estimated?: boolean;
 }
 
 export class CreateRecordDto {

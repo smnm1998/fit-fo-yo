@@ -69,6 +69,7 @@ model DietItem {
   carbs     Float?
   protein   Float?
   fat       Float?
+  estimated Boolean   @default(false)
   createdAt DateTime  @default(now())
 
   @@index([recordId])
@@ -82,6 +83,7 @@ model ExerciseItem {
   durationMinutes Int?
   intensity       String?
   caloriesBurned  Int?
+  estimated       Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   @@index([recordId])
