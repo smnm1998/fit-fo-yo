@@ -9,6 +9,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { RecordsModule } from './records/records.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -22,7 +23,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 
     // 2. Rate Limiting (글로벌 + AI 전용)
     ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 }, // 분당 100회
+      { name: 'default', ttl: 60_000, limit: 100 },
+      { name: 'ai', ttl: 60_000, limit: 10 },
     ]),
 
     // 3. 모듈
@@ -30,6 +32,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     PrismaModule,
     HealthModule,
     RecordsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
