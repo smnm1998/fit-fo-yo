@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
+import { RecordsModule } from './records/records.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -28,6 +29,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AuthModule,
     PrismaModule,
     HealthModule,
+    RecordsModule,
   ],
   controllers: [AppController],
   providers: [
