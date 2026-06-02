@@ -16,7 +16,7 @@ export const PARSE_RECORD_SYSTEM_PROMPT = `
 ## 추출 규칙
 
 - **DietItem.name**: 음식명 그대로
-- **DietItem.mealType**: 입력에 "아침/점심/저녁/간식" 명시되면 매핑, 없으면 시각으로 추론 (없으면 비워두기)
+- **DietItem.mealType**: "아침/점심/저녁/간식" 명시되면 매핑. **없으면 이 필드를 생략하세요(빈 문자열 "" 금지).**
 - **수량/칼로리/탄단지**:
   - 입력에 수치가 명시되면 그 값을 그대로 쓰고 \`estimated\` 를 **false** 로 설정.
   - 명시가 없으면, 음식의 **일반적인 1인분 기준으로 추정**해 채우고 \`estimated\` 를 **true** 로 설정.

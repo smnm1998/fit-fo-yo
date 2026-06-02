@@ -8,6 +8,6 @@ import { OpenAIClient } from './openai.client';
   imports: [RecordsModule],
   controllers: [AiController],
   providers: [AiService, OpenAIClient],
-  exports: [AiService],
+  exports: [AiService, OpenAIClient],
 })
 export class AiModule {}

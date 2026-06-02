@@ -10,6 +10,7 @@ import { HealthModule } from './health/health.module';
 import { RecordsModule } from './records/records.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AiModule } from './ai/ai.module';
+import { RecommendationModule } from './recommendation/recommendation.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { AiModule } from './ai/ai.module';
     HealthModule,
     RecordsModule,
     AiModule,
+    RecommendationModule,
   ],
   controllers: [AppController],
   providers: [
