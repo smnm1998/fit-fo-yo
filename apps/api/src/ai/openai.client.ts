@@ -44,4 +44,21 @@ export class OpenAIClient {
 
     return response;
   }
+
+  /**
+   * tool 없는 일반 텍스트 생성. 추천 메시지 같은 자유 서술용.
+   */
+  async chatText(params: { system: string; user: string }): Promise<string> {
+    const response = await this.client.chat.completions.create({
+      model: this.model,
+      messages: [
+        { role: 'system', content: params.system },
+        { role: 'user', content: params.user },
+      ],
+      temperature: 0.7,
+    });
+
+    this.logger.debug(`OpenAI usage (chatText): ${JSON.stringify(response.usage)}`);
+    return response.choices[0]?.message.content?.trim() ?? '';
+  }
 }

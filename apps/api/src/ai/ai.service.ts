@@ -89,7 +89,7 @@ export class AiService {
         recordedAt,
         dietItems: parsed.payload.items.map((item) => ({
           name: item.name,
-          mealType: item.mealType,
+          mealType: item.mealType || undefined,
           quantity: item.quantity,
           unit: item.unit,
           calories: item.calories,
