@@ -40,10 +40,10 @@ export class AuthController {
   async signup(
     @Body() dto: SignupDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ user: AuthUser }> {
+  ): Promise<{ user: AuthUser; tokens: AuthTokens }> {
     const { user, tokens } = await this.auth.signup(dto);
     this.setAuthCookies(res, tokens);
-    return { user };
+    return { user, tokens };
   }
 
   // Google OAuth: 로그인 트리거
@@ -81,10 +81,10 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ user: AuthUser }> {
+  ): Promise<{ user: AuthUser; tokens: AuthTokens }> {
     const { user, tokens } = await this.auth.login(dto);
     this.setAuthCookies(res, tokens);
-    return { user };
+    return { user, tokens };
   }
 
   // Refresh (Rotation)
@@ -94,11 +94,11 @@ export class AuthController {
   async refresh(
     @Req() req: Request & { user: RefreshRequestUser },
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ ok: true }> {
+  ): Promise<{ tokens: AuthTokens }> {
     const { id, isGuest } = req.user;
     const tokens = await this.auth.refresh(id, isGuest);
     this.setAuthCookies(res, tokens);
-    return { ok: true };
+    return { tokens };
   }
 
   // 로그아웃
@@ -125,10 +125,12 @@ export class AuthController {
   @Post('guest')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(HttpStatus.CREATED)
-  async guest(@Res({ passthrough: true }) res: Response): Promise<{ user: AuthUser }> {
+  async guest(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ user: AuthUser; tokens: AuthTokens }> {
     const { user, tokens } = await this.auth.issueGuest();
     this.setAuthCookies(res, tokens);
-    return { user };
+    return { user, tokens };
   }
 
   // 쿠키 헬퍼
