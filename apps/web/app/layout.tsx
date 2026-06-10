@@ -3,8 +3,8 @@ import localFont from 'next/font/local';
 import './globals.css';
 
 const pretendard = localFont({
-  src: './fonts/PretendardVariable.woff2',
-  variable: '--font-pretendard',
+  src: './fonts/IBMPlexSansKR-Medium.woff2',
+  variable: '--font-sans-kr',
   display: 'swap',
   weight: '45 920',
 });

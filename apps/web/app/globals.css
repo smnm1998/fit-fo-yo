@@ -10,7 +10,7 @@
   --color-accent: #171717;
   --color-danger: #dc2626;
 
-  --font-sans: var(--font-pretendard), system-ui, sans-serif;
+  --font-sans: var(--font-sans-kr), system-ui, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', monospace;
 }
 
