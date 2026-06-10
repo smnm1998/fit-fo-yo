@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 
 export class SignupDto {
   @IsEmail({}, { message: '유효한 이메일 형식이 아닙니다.' })
@@ -13,9 +13,8 @@ export class SignupDto {
   })
   password!: string;
 
-  @IsOptional()
-  @IsString()
+  @IsString({ message: '닉네임을 입력하세요.' })
   @MinLength(2, { message: '닉네임은 2자 이상이어야 합니다.' })
-  @MaxLength(15, { message: '닉네임은 15자 이하여야 합니다.' })
-  nickname?: string;
+  @MaxLength(10, { message: '닉네임은 10자 이하여야 합니다.' })
+  nickname!: string;
 }
