@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await req.json();
+  const data = await res.json();
   if (!res.ok) return NextResponse.json(data, { status: res.status });
 
   await setAuthCookies(data.tokens);
