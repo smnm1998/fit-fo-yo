@@ -11,17 +11,21 @@ export type PendingRecord = {
 type RecordsState = {
   records: RecordDto[];
   pending: PendingRecord[];
+  notice: string | null;
   setRecords: (records: RecordDto[]) => void;
   addPending: (p: PendingRecord) => void;
   resolvePending: (tempId: string, record: RecordDto) => void;
   failPending: (tempId: string, error: string) => void;
   dismissPending: (tempId: string) => void;
   removeRecord: (id: string) => void;
+  restoreRecord: (record: RecordDto) => void;
+  setNotice: (notice: string | null) => void;
 };
 
 export const useRecordsStore = create<RecordsState>((set) => ({
   records: [],
   pending: [],
+  notice: null,
   setRecords: (records) => set({ records }),
   addPending: (p) => set((s) => ({ pending: [p, ...s.pending] })),
   resolvePending: (tempId, record) =>
@@ -36,4 +40,9 @@ export const useRecordsStore = create<RecordsState>((set) => ({
   dismissPending: (tempId) =>
     set((s) => ({ pending: s.pending.filter((p) => p.tempId !== tempId) })),
   removeRecord: (id) => set((s) => ({ records: s.records.filter((r) => r.id !== id) })),
+  restoreRecord: (record) =>
+    set((s) => ({
+      records: [...s.records, record].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
+    })),
+  setNotice: (notice) => set({ notice }),
 }));

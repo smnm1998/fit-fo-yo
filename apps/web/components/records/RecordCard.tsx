@@ -1,6 +1,9 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { deleteRecord, ApiError } from '@/lib/client/records-api';
+import { useRecordsStore } from '@/lib/store/records-store';
 import type { DietItem, ExerciseItem, RecordDto } from '@/lib/types';
 
 const MEAL_LABEL: Record<string, string> = {
@@ -12,10 +15,12 @@ const MEAL_LABEL: Record<string, string> = {
 
 const STYLES = {
   head: 'mb-3 flex items-center justify-between',
+  left: 'flex items-center gap-2',
   type: 'rounded-full bg-subtle px-2 py-0.5 text-xs font-medium text-foreground',
   time: 'text-xs text-muted',
+  del: 'text-muted transition-colors hover:text-danger',
   items: 'flex flex-col gap-2.5',
-  item: 'text-sm font-medium text-foreground',
+  item: 'flex items-start justify-between gap-3',
   name: 'text-sm font-medium text-foreground',
   badge: 'ml-1.5 rounded bg-subtle px-1.5 py-0.5 text-[10px] font-medium text-muted',
   meta: 'mt-0.5 text-xs text-muted',
@@ -28,11 +33,35 @@ function timeLabel(iso: string): string {
 
 export function RecordCard({ record }: { record: RecordDto }) {
   const isDiet = record.type === 'DIET';
+  const removeRecord = useRecordsStore((s) => s.removeRecord);
+  const restoreRecord = useRecordsStore((s) => s.restoreRecord);
+  const setNotice = useRecordsStore((s) => s.setNotice);
+
+  async function onDelete() {
+    removeRecord(record.id); // 즉시 사라짐
+    try {
+      await deleteRecord(record.id);
+    } catch (err) {
+      restoreRecord(record); // 실패 → 되살림
+      setNotice(err instanceof ApiError ? err.message : '삭제에 실패했어요. 다시 시도해주세요.');
+    }
+  }
+
   return (
     <Card>
       <div className={STYLES.head}>
-        <span className={STYLES.type}>{isDiet ? '식단' : '운동'}</span>
-        <span className={STYLES.time}>{timeLabel(record.recordedAt)}</span>
+        <div className={STYLES.left}>
+          <span className={STYLES.type}>{isDiet ? '식단' : '운동'}</span>
+          <span className={STYLES.time}>{timeLabel(record.recordedAt)}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void onDelete()}
+          className={STYLES.del}
+          aria-label="기록 삭제"
+        >
+          <Trash2 size={16} />
+        </button>
       </div>
       <div className={STYLES.items}>
         {isDiet
@@ -57,7 +86,9 @@ function DietRow({ item }: { item: DietItem }) {
         {item.estimated && <span className={STYLES.badge}>추정</span>}
         {meta && <div className={STYLES.meta}>{meta}</div>}
       </div>
-      {typeof item.calories === 'number' && <span className={STYLES.metric}>{item.calories}</span>}
+      {typeof item.calories === 'number' && (
+        <span className={STYLES.metric}>{item.calories} kcal</span>
+      )}
     </div>
   );
 }
