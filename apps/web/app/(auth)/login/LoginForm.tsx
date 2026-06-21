@@ -43,7 +43,7 @@ export function LoginForm() {
     try {
       const { user } = await login(values.email, values.password);
       setUser(user);
-      router.replace(params.get('redirect') ?? '/');
+      router.replace(params.get('redirect') ?? '/dashboard');
       router.refresh();
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : '로그인에 실패했습니다.');

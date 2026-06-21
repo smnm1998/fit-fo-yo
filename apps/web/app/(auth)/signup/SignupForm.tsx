@@ -46,7 +46,7 @@ export function SignupForm() {
         nickname: values.nickname,
       });
       setUser(user);
-      router.replace('/');
+      router.replace('/dashboard');
       router.refresh();
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : '회원가입에 실패했습니다.');
