@@ -19,7 +19,7 @@ function extractMessage(data: unknown): string {
   return '요청을 처리하지 못했습니다.';
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init);
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, extractMessage(data));
