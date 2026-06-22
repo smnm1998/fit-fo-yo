@@ -32,7 +32,8 @@ export class RecommendationService {
    * 어제 records 0건이면 skip (불필요한 OpenAI 호출 방지).
    */
   async generateForUser(userId: string, forDate: Date) {
-    const { start, end } = this.yesterdayRange(forDate);
+    const targetDate = this.toKSTDateOnly(forDate);
+    const { start, end } = this.yesterdayRange(targetDate);
 
     const records = await this.prisma.record.findMany({
       where: { userId, recordedAt: { gte: start, lte: end } },
@@ -51,8 +52,8 @@ export class RecommendationService {
     const payload = { message, focus, summary } satisfies Prisma.InputJsonValue;
 
     return this.prisma.recommendation.upsert({
-      where: { userId_forDate: { userId, forDate } },
-      create: { userId, forDate, payload },
+      where: { userId_forDate: { userId, forDate: targetDate } },
+      create: { userId, forDate: targetDate, payload },
       update: { payload },
     });
   }
@@ -167,6 +168,12 @@ export class RecommendationService {
     });
 
     return message || '어제 기록을 바탕으로 오늘도 균형 잡힌 식단과 가벼운 운동을 추천해요.';
+  }
+
+  private toKSTDateOnly(d: Date): Date {
+    const KST = 9 * 60 * 60 * 1000;
+    const k = new Date(d.getTime() + KST);
+    return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
   }
 
   /**
