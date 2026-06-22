@@ -41,3 +41,28 @@ export type RecordDto = {
   dietItems: DietItem[];
   exerciseItems: ExerciseItem[];
 };
+
+export type RecommendationFocus = 'diet' | 'exercise' | 'balanced';
+
+export type DailySummary = {
+  totalCalories: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  exerciseMinutes: number;
+  caloriesBurned: number;
+  dietCount: number;
+  exerciseCount: number;
+};
+
+export type RecommendationPayload = {
+  message: string;
+  focus: RecommendationFocus;
+  summary: DailySummary;
+};
+
+export type RecommendationDto = {
+  id: string;
+  forDate: string;
+  payload: RecommendationPayload;
+};
