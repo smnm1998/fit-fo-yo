@@ -31,7 +31,13 @@ function timeLabel(iso: string): string {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function RecordCard({ record }: { record: RecordDto }) {
+export function RecordCard({
+  record,
+  readOnly = false,
+}: {
+  record: RecordDto;
+  readOnly?: boolean;
+}) {
   const isDiet = record.type === 'DIET';
   const removeRecord = useRecordsStore((s) => s.removeRecord);
   const restoreRecord = useRecordsStore((s) => s.restoreRecord);
@@ -54,14 +60,16 @@ export function RecordCard({ record }: { record: RecordDto }) {
           <span className={STYLES.type}>{isDiet ? '식단' : '운동'}</span>
           <span className={STYLES.time}>{timeLabel(record.recordedAt)}</span>
         </div>
-        <button
-          type="button"
-          onClick={() => void onDelete()}
-          className={STYLES.del}
-          aria-label="기록 삭제"
-        >
-          <Trash2 size={16} />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => void onDelete()}
+            className={STYLES.del}
+            aria-label="기록 삭제"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
       </div>
       <div className={STYLES.items}>
         {isDiet

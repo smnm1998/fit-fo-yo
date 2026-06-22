@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { cn } from '@/lib/cn';
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { logout } from '@/lib/client/auth-api';
@@ -12,6 +14,10 @@ const STYLES = {
     'sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-surface px-4',
   brand: 'flex items-center gap-2',
   brandName: 'text-base font-bold text-foreground',
+  nav: 'flex items-center gap-1',
+  navLink:
+    'rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
+  navLinkActive: 'bg-subtle text-foreground',
   right: 'flex items-center gap-3',
   nickname: 'text-sm text-muted',
   logout: 'text-sm font-medium text-muted transition-colors hover:text-foreground',
@@ -40,6 +46,10 @@ export function AppShell({ user, children }: { user: ApiUser; children: React.Re
   return (
     <div className="min-h-screen">
       <header className={STYLES.header}>
+        <nav className={STYLES.nav}>
+          <NavLink href="/dashboard">오늘</NavLink>
+          <NavLink href="/calendar">캘린더</NavLink>
+        </nav>
         <div className={STYLES.brand}>
           <Image src="/Symbol.svg" alt="" width={24} height={24} />
           <span className={STYLES.brandName}>FitFoYo</span>
@@ -53,5 +63,15 @@ export function AppShell({ user, children }: { user: ApiUser; children: React.Re
       </header>
       <main className={STYLES.main}>{children}</main>
     </div>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  const pathname = usePathname();
+  const active = pathname.startsWith(href);
+  return (
+    <Link href={href} className={cn(STYLES.navLink, active && STYLES.navLinkActive)}>
+      {children}
+    </Link>
   );
 }
