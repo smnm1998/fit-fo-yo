@@ -7,6 +7,7 @@ import {
   startOfDay,
   startOfMonth,
   startOfWeek,
+  subDays,
 } from 'date-fns';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 
@@ -71,4 +72,18 @@ export function monthLabel(month: string): string {
 export function dateLabel(date: string): string {
   const [, m, d] = date.split('-');
   return `${Number(m)}월 ${Number(d)}일`;
+}
+
+/** 지난 n일(오늘 포함)의 UTC 범위 */
+export function weekRangeKST(days = 7): { from: string; to: string } {
+  const zonedNow = toZonedTime(new Date(), TZ);
+  const from = fromZonedTime(startOfDay(subDays(zonedNow, days - 1)), TZ).toISOString();
+  const to = fromZonedTime(endOfDay(zonedNow), TZ).toISOString();
+  return { from, to };
+}
+
+/** 지난 n일의 'YYYY-MM-DD' 배열(오래된->오늘, KST) - 차트 x축: 집계 정렬용 */
+export function weekDayKeysKST(days = 7): string[] {
+  const end = startOfDay(toZonedTime(new Date(), TZ));
+  return Array.from({ length: days }, (_, i) => format(subDays(end, days - 1 - i), 'yyyy-MM-dd'));
 }

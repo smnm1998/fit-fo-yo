@@ -1,4 +1,5 @@
 import type { RecordDto } from '@/lib/types';
+import { dayKeyKST } from '@/lib/date';
 
 export type DayTotals = {
   calories: number;
@@ -32,4 +33,14 @@ export function sumRecords(records: RecordDto[]): DayTotals {
     }
   }
   return t;
+}
+
+export type DayPoint = DayTotals & { date: string };
+
+export function sumRecordsByDay(records: RecordDto[], dayKeys: string[]): DayPoint[] {
+  const groups = new Map<string, RecordDto[]>(dayKeys.map((k) => [k, []]));
+  for (const r of records) {
+    groups.get(dayKeyKST(r.recordedAt))?.push(r);
+  }
+  return dayKeys.map((date) => ({ date, ...sumRecords(groups.get(date) ?? []) }));
 }

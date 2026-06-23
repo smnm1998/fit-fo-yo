@@ -1,0 +1,149 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { BarChart3, CalendarDays, Home, LogOut, PanelLeft, X } from 'lucide-react';
+import { cn } from '@/lib/cn';
+import { logout } from '@/lib/client/auth-api';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { useUiStore } from '@/lib/store/ui-store';
+
+const NAV = [
+  { href: '/dashboard', label: '오늘', Icon: Home },
+  { href: '/calendar', label: '캘린더', Icon: CalendarDays },
+  { href: '/stats', label: '통계', Icon: BarChart3 },
+] as const;
+
+const STYLES = {
+  backdrop: 'fixed inset-0 z-40 bg-black/20 md:hidden',
+  aside:
+    'fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-border bg-surface transition-all md:sticky md:top-0 md:h-screen md:z-auto md:translate-x-0',
+  brand: 'flex h-14 items-center px-4',
+  brandName: 'truncate text-base font-bold text-foreground',
+  nav: 'flex flex-1 flex-col gap-1 px-2 py-2',
+  link: 'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
+  linkActive: 'bg-subtle text-foreground',
+  bottom: 'flex flex-col gap-1 border-t border-border p-2',
+  iconBtn: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground',
+  tooltip:
+    'pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 md:block',
+} as const;
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const clear = useAuthStore((s) => s.clear);
+  const collapsed = useUiStore((s) => s.collapsed);
+  const mobileOpen = useUiStore((s) => s.mobileOpen);
+  const toggleCollapsed = useUiStore((s) => s.toggleCollapsed);
+  const setMobileOpen = useUiStore((s) => s.setMobileOpen);
+
+  async function onLogout() {
+    try {
+      await logout();
+    } finally {
+      clear();
+      router.replace('/login');
+      router.refresh();
+    }
+  }
+
+  return (
+    <>
+      {mobileOpen && <div className={STYLES.backdrop} onClick={() => setMobileOpen(false)} />}
+      <aside
+        className={cn(
+          STYLES.aside,
+          collapsed ? 'md:w-16' : 'md:w-60',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}
+      >
+        {/* 브랜드 */}
+        <div
+          className={cn(
+            STYLES.brand,
+            collapsed ? 'justify-between md:justify-center md:px-2' : 'justify-between',
+          )}
+        >
+          {/* 펼침 브랜드 (모바일 항상 + 데스크탑 펼침) */}
+          <div className={cn('flex min-w-0 items-center gap-2', collapsed && 'md:hidden')}>
+            <Image src="/Symbol.svg" alt="" width={24} height={24} className="shrink-0" />
+            <span className={STYLES.brandName}>FitFoYo</span>
+          </div>
+
+          {/* 데스크탑 접힘: 심볼=펼치기 (hover 시 360° 회전 → 접기 아이콘) */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="사이드바 펼치기"
+            className={cn(
+              'group relative hidden h-9 w-9 items-center justify-center',
+              collapsed && 'md:flex',
+            )}
+          >
+            <Image
+              src="/Symbol.svg"
+              alt=""
+              width={24}
+              height={24}
+              className="transition-all duration-500 group-hover:rotate-[360deg] group-hover:opacity-0"
+            />
+            <PanelLeft
+              size={18}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            />
+          </button>
+
+          {/* 데스크탑 펼침: 접기 토글 */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="사이드바 접기"
+            className={cn(STYLES.iconBtn, 'hidden md:flex', collapsed && 'md:hidden')}
+          >
+            <PanelLeft size={18} />
+          </button>
+
+          {/* 모바일 닫기 */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="메뉴 닫기"
+            className={cn(STYLES.iconBtn, 'md:hidden')}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* 네비 */}
+        <nav className={STYLES.nav}>
+          {NAV.map(({ href, label, Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(STYLES.link, active && STYLES.linkActive)}
+              >
+                <Icon size={18} className="shrink-0" />
+                <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
+                {collapsed && <span className={STYLES.tooltip}>{label}</span>}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* 하단: 로그아웃 (닉네임은 대시보드로 이동) */}
+        <div className={STYLES.bottom}>
+          <button type="button" onClick={onLogout} className={STYLES.link}>
+            <LogOut size={18} className="shrink-0" />
+            <span className={cn('truncate', collapsed && 'md:hidden')}>로그아웃</span>
+            {collapsed && <span className={STYLES.tooltip}>로그아웃</span>}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
