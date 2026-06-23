@@ -49,6 +49,7 @@ export function AppShell({ user, children }: { user: ApiUser; children: React.Re
         <nav className={STYLES.nav}>
           <NavLink href="/dashboard">오늘</NavLink>
           <NavLink href="/calendar">캘린더</NavLink>
+          <NavLink href="/stats">통계</NavLink>
         </nav>
         <div className={STYLES.brand}>
           <Image src="/Symbol.svg" alt="" width={24} height={24} />
