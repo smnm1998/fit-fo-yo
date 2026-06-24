@@ -15,7 +15,7 @@ const STYLES = {
     'sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-border bg-surface px-4 md:hidden',
   brandName: 'text-base font-bold text-foreground',
   iconBtn: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground',
-  main: 'mx-auto w-full max-w-3xl px-4 py-6',
+  main: 'mx-auto w-full max-w-6xl px-4 py-6',
 } as const;
 
 export function AppShell({ user, children }: { user: ApiUser; children: React.ReactNode }) {

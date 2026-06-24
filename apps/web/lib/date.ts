@@ -9,6 +9,7 @@ import {
   startOfWeek,
   subDays,
 } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 
 const TZ = 'Asia/Seoul';
@@ -86,4 +87,14 @@ export function weekRangeKST(days = 7): { from: string; to: string } {
 export function weekDayKeysKST(days = 7): string[] {
   const end = startOfDay(toZonedTime(new Date(), TZ));
   return Array.from({ length: days }, (_, i) => format(subDays(end, days - 1 - i), 'yyyy-MM-dd'));
+}
+
+/** 인사말용 — "6월 23일 월요일" (KST) */
+export function todayLabelLong(): string {
+  return formatInTimeZone(new Date(), TZ, 'M월 d일 EEEE', { locale: ko });
+}
+
+/** dayKey('YYYY-MM-DD') → 그 날 정오(KST) ISO. recordedAt 기본값용(정오라 UTC 변환에도 날짜 안 밀림) */
+export function dayNoonIsoKST(dayKey: string): string {
+  return new Date(`${dayKey}T12:00:00+09:00`).toISOString();
 }
