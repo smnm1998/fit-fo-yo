@@ -1,8 +1,4 @@
-'use client';
-
-import { useSeededRecords } from '@/lib/hooks/useSeededRecords';
-import { sumRecords } from '@/lib/records';
-import type { RecordDto } from '@/lib/types';
+import type { DayTotals } from '@/lib/records';
 
 const STYLES = {
   grid: 'grid grid-cols-2 gap-3 sm:grid-cols-4',
@@ -12,14 +8,12 @@ const STYLES = {
   unit: 'ml-1 text-sm font-normal text-muted',
 } as const;
 
-export function TodaySummary({ initial }: { initial: RecordDto[] }) {
-  const records = useSeededRecords(initial);
-  const t = sumRecords(records);
+export function MetricCards({ totals, count }: { totals: DayTotals; count: number }) {
   const cards = [
-    { label: '섭취', value: t.calories, unit: 'kcal' },
-    { label: '소모', value: t.caloriesBurned, unit: 'kcal' },
-    { label: '순 칼로리', value: t.calories - t.caloriesBurned, unit: 'kcal' },
-    { label: '기록', value: records.length, unit: '건' },
+    { label: '섭취', value: totals.calories, unit: 'kcal' },
+    { label: '소모', value: totals.caloriesBurned, unit: 'kcal' },
+    { label: '순 칼로리', value: totals.calories - totals.caloriesBurned, unit: 'kcal' },
+    { label: '기록', value: count, unit: '건' },
   ];
   return (
     <div className={STYLES.grid}>
