@@ -13,7 +13,7 @@ const STYLES = {
   hint: 'text-xs text-muted',
 } as const;
 
-export function RecordInput() {
+export function RecordInput({ recordedAt }: { recordedAt?: string } = {}) {
   const [value, setValue] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const addPending = useRecordsStore((s) => s.addPending);
@@ -28,7 +28,7 @@ export function RecordInput() {
     setValue('');
     setSubmitting(true);
     try {
-      const record = await parseAndSave(text);
+      const record = await parseAndSave(text, recordedAt);
       resolvePending(tempId, record);
     } catch (err) {
       failPending(tempId, err instanceof ApiError ? err.message : '기록에 실패했습니다.');

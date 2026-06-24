@@ -6,15 +6,14 @@ import type { RecordDto } from '@/lib/types';
 import { DayCell } from './DayCell';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+const EMPTY: RecordDto[] = [];
 
 const STYLES = {
-  wrap: 'rounded-lg border border-border bg-surface p-4',
-  weekRow: 'mb-1 grid grid-cols-7',
-  weekday: 'py-1 text-center text-xs font-medium text-muted',
-  grid: 'grid grid-cols-7 gap-0.5',
+  wrap: 'overflow-hidden rounded-lg border border-border',
+  weekRow: 'grid grid-cols-7 border-b border-border bg-surface',
+  weekday: 'py-2 text-center text-xs font-medium text-muted',
+  grid: 'grid grid-cols-7 gap-px bg-border',
 } as const;
-
-type DayMarks = { diet: boolean; exercise: boolean };
 
 type CalendarGridProps = {
   month: string;
@@ -27,16 +26,16 @@ export function CalendarGrid({ month, records, selectedDate, onSelect }: Calenda
   const days = useMemo(() => monthGridKST(month), [month]);
   const today = todayKST();
 
-  // 날짜별 기록 유무(식단/운동) 인덱스
-  const marks = useMemo(() => {
-    const map = new Map<string, DayMarks>();
+  // 날짜별 기록 배열(시간순)
+  const byDay = useMemo(() => {
+    const map = new Map<string, RecordDto[]>();
     for (const r of records) {
       const key = dayKeyKST(r.recordedAt);
-      const cur = map.get(key) ?? { diet: false, exercise: false };
-      if (r.type === 'DIET') cur.diet = true;
-      else cur.exercise = true;
-      map.set(key, cur);
+      const arr = map.get(key);
+      if (arr) arr.push(r);
+      else map.set(key, [r]);
     }
+    for (const arr of map.values()) arr.sort((a, b) => a.recordedAt.localeCompare(b.recordedAt));
     return map;
   }, [records]);
 
@@ -50,21 +49,17 @@ export function CalendarGrid({ month, records, selectedDate, onSelect }: Calenda
         ))}
       </div>
       <div className={STYLES.grid}>
-        {days.map((date) => {
-          const mark = marks.get(date);
-          return (
-            <DayCell
-              key={date}
-              date={date}
-              inMonth={date.slice(0, 7) === month}
-              isToday={date === today}
-              isSelected={date === selectedDate}
-              hasDiet={mark?.diet ?? false}
-              hasExercise={mark?.exercise ?? false}
-              onSelect={onSelect}
-            />
-          );
-        })}
+        {days.map((date) => (
+          <DayCell
+            key={date}
+            date={date}
+            inMonth={date.slice(0, 7) === month}
+            isToday={date === today}
+            isSelected={date === selectedDate}
+            records={byDay.get(date) ?? EMPTY}
+            onSelect={onSelect}
+          />
+        ))}
       </div>
     </div>
   );
