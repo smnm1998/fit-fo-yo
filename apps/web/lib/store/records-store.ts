@@ -20,6 +20,7 @@ type RecordsState = {
   removeRecord: (id: string) => void;
   restoreRecord: (record: RecordDto) => void;
   setNotice: (notice: string | null) => void;
+  addRecord: (record: RecordDto) => void;
 };
 
 export const useRecordsStore = create<RecordsState>((set) => ({
@@ -45,4 +46,5 @@ export const useRecordsStore = create<RecordsState>((set) => ({
       records: [...s.records, record].sort((a, b) => b.recordedAt.localeCompare(a.recordedAt)),
     })),
   setNotice: (notice) => set({ notice }),
+  addRecord: (record) => set((s) => ({ records: [record, ...s.records] })),
 }));

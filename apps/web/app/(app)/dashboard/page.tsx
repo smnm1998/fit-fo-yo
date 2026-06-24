@@ -1,49 +1,53 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
-import { todayRangeKST } from '@/lib/date';
-import { RecordInput } from '@/components/records/RecordInput';
-import { RecordList } from '@/components/records/RecordList';
-import { TodaySummary } from '@/components/records/TodaySummary';
-import { RecommendationCard } from '@/components/recommendation/RecommendationCard';
+import { getCurrentUser } from '@/lib/server/user';
+import { currentMonthKST, monthRangeKST, todayKST } from '@/lib/date';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
-import { GenerateRecommendation } from '@/components/recommendation/GenerateRecommendation';
 
-export const metadata: Metadata = { title: '오늘 · FitFoYo' };
+export const metadata: Metadata = { title: '캘린더 · FitFoYo' };
 
-async function getTodayRecords(): Promise<RecordDto[]> {
-  const { from, to } = todayRangeKST();
-  const res = await apiFetchAuth(
-    `/records?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-  );
+async function getMonthRecords(month: string): Promise<RecordDto[]> {
+  const { from, to } = monthRangeKST(month);
+  const qs = new URLSearchParams({ from, to, limit: '200' });
+  const res = await apiFetchAuth(`/records?${qs.toString()}`);
   if (!res.ok) return [];
   const data = (await res.json()) as { items: RecordDto[] };
   return data.items;
 }
 
-async function getTodayRecommendation(): Promise<RecommendationDto | null> {
-  const res = await apiFetchAuth('/recommendations/today');
-  if (!res.ok) return null;
-  return (await res.json()) as RecommendationDto;
+async function getMonthRecommendations(month: string): Promise<RecommendationDto[]> {
+  const { from, to } = monthRangeKST(month);
+  const qs = new URLSearchParams({ from, to });
+  const res = await apiFetchAuth(`/recommendations?${qs.toString()}`);
+  if (!res.ok) return [];
+  return (await res.json()) as RecommendationDto[];
 }
 
-export default async function DashboardPage() {
-  const [initial, recommendation] = await Promise.all([
-    getTodayRecords(),
-    getTodayRecommendation(),
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; date?: string }>;
+}) {
+  const sp = await searchParams;
+  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonthKST();
+  const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayKST();
+  const [user, initialRecords, initialRecommendations] = await Promise.all([
+    getCurrentUser(),
+    getMonthRecords(month),
+    getMonthRecommendations(month),
   ]);
+
   return (
-    <section className="flex flex-col gap-6">
-      {recommendation ? (
-        <RecommendationCard recommendation={recommendation} />
-      ) : (
-        <GenerateRecommendation />
-      )}
-      <TodaySummary />
-      <div>
-        <h1 className="mb-3 text-xl font-semibold text-foreground">오늘의 기록</h1>
-        <RecordInput />
-      </div>
-      <RecordList initial={initial} />
-    </section>
+    <div className="flex flex-col gap-6">
+      <DashboardHeader nickname={user?.nickname} />
+      <CalendarWorkspace
+        initialMonth={month}
+        initialDate={date}
+        initialRecords={initialRecords}
+        initialRecommendations={initialRecommendations}
+      />
+    </div>
   );
 }

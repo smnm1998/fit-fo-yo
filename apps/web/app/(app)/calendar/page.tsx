@@ -1,47 +1,5 @@
-import { CalendarView } from '@/components/calendar/CalendarView';
-import { currentMonthKST, monthRangeKST, todayKST } from '@/lib/date';
-import { apiFetchAuth } from '@/lib/server/api';
-import type { RecommendationDto, RecordDto } from '@/lib/types';
-import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = { title: '캘린더 · FitFoYo' };
-
-async function getMonthRecords(month: string): Promise<RecordDto[]> {
-  const { from, to } = monthRangeKST(month);
-  const qs = new URLSearchParams({ from, to, limit: '200' });
-  const res = await apiFetchAuth(`/records?${qs.toString()}`);
-  if (!res.ok) return [];
-  const data = (await res.json()) as { items: RecordDto[] };
-  return data.items;
-}
-
-async function getMonthRecommendations(month: string): Promise<RecommendationDto[]> {
-  const { from, to } = monthRangeKST(month);
-  const qs = new URLSearchParams({ from, to });
-  const res = await apiFetchAuth(`/recommendations?${qs.toString()}`);
-  if (!res.ok) return [];
-  return (await res.json()) as RecommendationDto[];
-}
-
-export default async function CalendarPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string; date?: string }>;
-}) {
-  const sp = await searchParams;
-  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonthKST();
-  const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayKST();
-  const [initialRecords, initialRecommendations] = await Promise.all([
-    getMonthRecords(month),
-    getMonthRecommendations(month),
-  ]);
-
-  return (
-    <CalendarView
-      initialMonth={month}
-      initialDate={date}
-      initialRecords={initialRecords}
-      initialRecommendations={initialRecommendations}
-    />
-  );
+export default function CalendarRedirect() {
+  redirect('/dashboard');
 }

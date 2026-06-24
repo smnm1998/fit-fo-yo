@@ -3,15 +3,14 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, CalendarDays, Home, LogOut, PanelLeft, X } from 'lucide-react';
+import { BarChart3, CalendarDays, LogOut, PanelLeft, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { logout } from '@/lib/client/auth-api';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useUiStore } from '@/lib/store/ui-store';
 
 const NAV = [
-  { href: '/dashboard', label: '오늘', Icon: Home },
-  { href: '/calendar', label: '캘린더', Icon: CalendarDays },
+  { href: '/dashboard', label: '캘린더', Icon: CalendarDays },
   { href: '/stats', label: '통계', Icon: BarChart3 },
 ] as const;
 
