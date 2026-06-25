@@ -39,8 +39,10 @@ describe('RecommendationService', () => {
   let prisma: {
     record: { findMany: jest.Mock };
     recommendation: { upsert: jest.Mock; findUnique: jest.Mock; findMany: jest.Mock };
+    healthProfile: { findUnique: jest.Mock };
     user: { findMany: jest.Mock };
   };
+
   let openai: { chatText: jest.Mock };
 
   beforeEach(async () => {
@@ -51,8 +53,10 @@ describe('RecommendationService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
       },
+      healthProfile: { findUnique: jest.fn().mockResolvedValue(null) },
       user: { findMany: jest.fn() },
     };
+
     openai = { chatText: jest.fn().mockResolvedValue('오늘은 단백질을 늘려보세요!') };
 
     const moduleRef = await Test.createTestingModule({

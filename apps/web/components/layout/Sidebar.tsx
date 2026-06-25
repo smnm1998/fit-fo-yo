@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+import * as Popover from '@radix-ui/react-popover';
+import { BarChart3, CalendarDays, LogOut, PanelLeft, User, X } from 'lucide-react';
+import { ProfileDialog } from '@/components/layout/ProfileDialog';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { BarChart3, CalendarDays, LogOut, PanelLeft, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { logout } from '@/lib/client/auth-api';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -24,12 +27,27 @@ const STYLES = {
   link: 'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
   linkActive: 'bg-subtle text-foreground',
   bottom: 'flex flex-col gap-1 border-t border-border p-2',
+  account:
+    'flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-subtle',
+  avatar: 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-surface',
+  accountInfo: 'flex min-w-0 flex-col',
+  accountName: 'truncate text-sm font-medium text-foreground',
+  accountEmail: 'truncate text-xs text-muted',
+  menu: 'z-50 flex w-44 flex-col rounded-xl border border-border bg-surface p-1 shadow-lg origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-[popIn_120ms_ease-out]',
+  menuItem:
+    'flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-subtle',
+
   iconBtn: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground',
   tooltip:
     'pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 md:block',
 } as const;
 
 export function Sidebar() {
+  const user = useAuthStore((s) => s.user);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const displayName = user?.nickname?.trim() || user?.email?.split('@')[0] || '사용자';
+
   const pathname = usePathname();
   const router = useRouter();
   const clear = useAuthStore((s) => s.clear);
@@ -134,13 +152,56 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* 하단: 로그아웃 (닉네임은 대시보드로 이동) */}
+        {/* 하단: 계정 */}
         <div className={STYLES.bottom}>
-          <button type="button" onClick={onLogout} className={STYLES.link}>
-            <LogOut size={18} className="shrink-0" />
-            <span className={cn('truncate', collapsed && 'md:hidden')}>로그아웃</span>
-            {collapsed && <span className={STYLES.tooltip}>로그아웃</span>}
-          </button>
+          <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>
+            <Popover.Trigger asChild>
+              <button
+                type="button"
+                className={cn(STYLES.account, collapsed && 'md:justify-center')}
+              >
+                <span className={STYLES.avatar}>
+                  <User size={18} />
+                </span>
+                <span className={cn(STYLES.accountInfo, collapsed && 'md:hidden')}>
+                  <span className={STYLES.accountName}>{displayName}</span>
+                  {user?.email && <span className={STYLES.accountEmail}>{user.email}</span>}
+                </span>
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                side="top"
+                align="start"
+                sideOffset={8}
+                collisionPadding={12}
+                className={STYLES.menu}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setProfileOpen(true);
+                  }}
+                  className={cn(STYLES.menuItem, 'text-foreground')}
+                >
+                  <User size={16} className="shrink-0" /> 내 정보
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void onLogout();
+                  }}
+                  className={cn(STYLES.menuItem, 'text-danger')}
+                >
+                  <LogOut size={16} className="shrink-0" /> 로그아웃
+                </button>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
+
+          <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
         </div>
       </aside>
     </>

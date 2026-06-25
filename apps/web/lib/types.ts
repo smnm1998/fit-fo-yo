@@ -66,3 +66,12 @@ export type RecommendationDto = {
   forDate: string;
   payload: RecommendationPayload;
 };
+
+export type HealthProfileDto = {
+  id: string;
+  heightCm?: number | null;
+  weightKg?: number | null;
+  conditions?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};

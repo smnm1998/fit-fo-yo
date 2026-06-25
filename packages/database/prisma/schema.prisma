@@ -34,6 +34,7 @@ model User {
 
   records         Record[]
   recommendations Recommendation[]
+  healthProfile   HealthProfile?
 
   @@unique([provider, providerId])
   @@index([isGuest, createdAt])
@@ -99,4 +100,15 @@ model Recommendation {
 
   @@unique([userId, forDate])
   @@index([userId, forDate])
+}
+
+model HealthProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  heightCm   Float?
+  weightKg   Float?
+  conditions String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
