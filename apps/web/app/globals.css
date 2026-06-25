@@ -1,32 +1,34 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --color-background: #f9f9f9;
-  --color-surface: #ffffff;
-  --color-foreground: #2a2a2a;
-  --color-muted: #737373;
-  --color-subtle: #f3f3f3;
-  --color-border: #e5e5e5;
-  --color-accent: #2a2a2a;
-  --color-danger: #dc2626;
-
-  --font-sans: var(--font-sans-kr), system-ui, sans-serif;
-  --font-mono: ui-monospace, 'SFMono-Regular', monospace;
+:root {
+  --background: #f9f9f9;
+  --surface: #ffffff;
+  --foreground: #2a2a2a;
+  --muted: #737373;
+  --subtle: #f3f3f3;
+  --border: #e5e5e5;
+  --accent: #2a2a2a;
+  --danger: #dc2626;
+}
+.dark {
+  --background: #1a1a1a;
+  --surface: #242424;
+  --foreground: #ededed;
+  --muted: #9a9a9a;
+  --subtle: #2e2e2e;
+  --border: #383838;
+  --accent: #ededed; /* 라이트로 반전 → 아바타/버튼 대비 유지 */
+  --danger: #f87171;
 }
 
-@keyframes popIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-body {
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans);
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
 }
