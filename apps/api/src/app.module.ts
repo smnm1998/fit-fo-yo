@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
+import { HealthProfileModule } from './health-profile/health-profile.module';
 import { RecordsModule } from './records/records.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AiModule } from './ai/ai.module';
@@ -34,6 +35,7 @@ import { RecommendationModule } from './recommendation/recommendation.module';
     HealthModule,
     RecordsModule,
     AiModule,
+    HealthProfileModule,
     RecommendationModule,
   ],
   controllers: [AppController],
