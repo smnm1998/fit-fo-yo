@@ -1,64 +1,41 @@
 'use client';
 
+import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { Trash2 } from 'lucide-react';
+import { Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { deleteRecord, ApiError } from '@/lib/client/records-api';
-import { useRecordsStore } from '@/lib/store/records-store';
+import { RECORD_TYPE_META, MEAL_LABEL, recordName } from '@/lib/record-meta';
+import { useDeleteRecord } from '@/lib/hooks/useDeleteRecord';
+import { RecordEditForm } from '@/components/records/RecordEditForm';
 import type { RecordDto } from '@/lib/types';
 
-const MEAL_LABEL: Record<string, string> = {
-  BREAKFAST: '아침',
-  LUNCH: '점심',
-  DINNER: '저녁',
-  SNACK: '간식',
-};
-
 const STYLES = {
-  chip: 'pointer-events-auto block w-full truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight',
-  diet: 'bg-emerald-100 text-emerald-800',
-  exercise: 'bg-sky-100 text-sky-800',
+  chip: 'pointer-events-auto block w-full truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight transition-colors',
   content:
-    'z-50 flex w-64 flex-col gap-2 rounded-xl border border-border bg-surface p-3 shadow-lg origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-[popIn_120ms_ease-out]',
+    'z-50 flex max-h-[70vh] w-64 flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-surface p-3 shadow-lg origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-[popIn_120ms_ease-out]',
   arrow: 'fill-surface',
   head: 'flex items-center gap-1.5',
   dot: 'h-2.5 w-2.5 shrink-0 rounded-full',
-  dotDiet: 'bg-emerald-500',
-  dotExercise: 'bg-sky-500',
   title: 'flex-1 truncate text-sm font-semibold text-foreground',
   itemRow: 'flex items-center justify-between gap-2 text-xs',
   itemName: 'truncate text-foreground',
   itemMetric: 'shrink-0 tabular-nums text-muted',
-  actions: 'mt-1 flex justify-end',
-  del: 'flex items-center gap-1 text-xs text-muted transition-colors hover:text-danger',
+  actions: 'flex shrink-0 items-center gap-1',
+  edit: 'text-muted transition-colors hover:text-foreground',
+  del: 'text-muted transition-colors hover:text-danger',
 } as const;
 
-function chipLabel(r: RecordDto): string {
-  const items = r.type === 'DIET' ? r.dietItems : r.exerciseItems;
-  return items.map((it) => it.name).join(', ') || (r.type === 'DIET' ? '식단' : '운동');
-}
-
 export function RecordChip({ record }: { record: RecordDto }) {
-  const removeRecord = useRecordsStore((s) => s.removeRecord);
-  const restoreRecord = useRecordsStore((s) => s.restoreRecord);
-  const setNotice = useRecordsStore((s) => s.setNotice);
+  const [editing, setEditing] = useState(false);
+  const deleteOne = useDeleteRecord();
+  const meta = RECORD_TYPE_META[record.type];
   const isDiet = record.type === 'DIET';
 
-  async function onDelete() {
-    removeRecord(record.id);
-    try {
-      await deleteRecord(record.id);
-    } catch (err) {
-      restoreRecord(record);
-      setNotice(err instanceof ApiError ? err.message : '삭제에 실패했어요.');
-    }
-  }
-
   return (
-    <Popover.Root>
+    <Popover.Root onOpenChange={(open) => !open && setEditing(false)}>
       <Popover.Trigger asChild>
-        <button type="button" className={cn(STYLES.chip, isDiet ? STYLES.diet : STYLES.exercise)}>
-          {chipLabel(record)}
+        <button type="button" className={cn(STYLES.chip, meta.chip)}>
+          {recordName(record)}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -70,37 +47,63 @@ export function RecordChip({ record }: { record: RecordDto }) {
           className={STYLES.content}
         >
           <div className={STYLES.head}>
-            <span className={cn(STYLES.dot, isDiet ? STYLES.dotDiet : STYLES.dotExercise)} />
-            <span className={STYLES.title}>{chipLabel(record)}</span>
+            <span className={cn(STYLES.dot, meta.dot)} />
+            <span className={STYLES.title}>{recordName(record)}</span>
+            {!editing && (
+              <div className={STYLES.actions}>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className={STYLES.edit}
+                  aria-label="수정"
+                >
+                  <Pencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void deleteOne(record)}
+                  className={STYLES.del}
+                  aria-label="삭제"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
           </div>
-          {isDiet
-            ? record.dietItems.map((it) => (
-                <div key={it.id} className={STYLES.itemRow}>
-                  <span className={STYLES.itemName}>
-                    {it.name}
-                    {it.mealType ? ` · ${MEAL_LABEL[it.mealType] ?? it.mealType}` : ''}
-                  </span>
-                  {typeof it.calories === 'number' && (
-                    <span className={STYLES.itemMetric}>{it.calories} kcal</span>
-                  )}
-                </div>
-              ))
-            : record.exerciseItems.map((it) => (
-                <div key={it.id} className={STYLES.itemRow}>
-                  <span className={STYLES.itemName}>
-                    {it.name}
-                    {it.durationMinutes ? ` · ${it.durationMinutes}분` : ''}
-                  </span>
-                  {typeof it.caloriesBurned === 'number' && (
-                    <span className={STYLES.itemMetric}>{it.caloriesBurned} kcal</span>
-                  )}
-                </div>
-              ))}
-          <div className={STYLES.actions}>
-            <button type="button" onClick={() => void onDelete()} className={STYLES.del}>
-              <Trash2 size={14} /> 삭제
-            </button>
-          </div>
+
+          {editing ? (
+            <RecordEditForm
+              record={record}
+              onSaved={() => setEditing(false)}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <>
+              {isDiet
+                ? record.dietItems.map((it) => (
+                    <div key={it.id} className={STYLES.itemRow}>
+                      <span className={STYLES.itemName}>
+                        {it.name}
+                        {it.mealType ? ` · ${MEAL_LABEL[it.mealType] ?? it.mealType}` : ''}
+                      </span>
+                      {typeof it.calories === 'number' && (
+                        <span className={STYLES.itemMetric}>{it.calories} kcal</span>
+                      )}
+                    </div>
+                  ))
+                : record.exerciseItems.map((it) => (
+                    <div key={it.id} className={STYLES.itemRow}>
+                      <span className={STYLES.itemName}>
+                        {it.name}
+                        {it.durationMinutes ? ` · ${it.durationMinutes}분` : ''}
+                      </span>
+                      {typeof it.caloriesBurned === 'number' && (
+                        <span className={STYLES.itemMetric}>{it.caloriesBurned} kcal</span>
+                      )}
+                    </div>
+                  ))}
+            </>
+          )}
           <Popover.Arrow className={STYLES.arrow} />
         </Popover.Content>
       </Popover.Portal>

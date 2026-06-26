@@ -10,10 +10,10 @@ import type { RecordDto } from '@/lib/types';
 const MAX_LINES = 3;
 
 const STYLES = {
-  cell: 'relative flex min-h-[5.5rem] flex-col gap-1 bg-surface p-1.5 transition-colors hover:bg-subtle',
+  cell: 'relative flex min-h-[6.5rem] flex-col gap-1 bg-surface p-1.5',
   today: 'bg-subtle',
-  filler: 'relative flex min-h-[5.5rem] flex-col gap-1 bg-surface p-1.5 text-muted/40',
-  addTrigger: 'absolute inset-0',
+  filler: 'relative flex min-h-[6.5rem] flex-col gap-1 bg-surface p-1.5 text-muted/40',
+  addTrigger: 'absolute inset-0 transition-colors hover:bg-subtle',
   inner: 'pointer-events-none relative z-10 flex flex-col gap-1',
   num: 'flex h-6 w-6 items-center justify-center rounded-full text-xs',
   numToday: 'font-semibold text-foreground',

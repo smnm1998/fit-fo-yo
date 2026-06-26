@@ -37,10 +37,11 @@ const MEALS = [
 const STYLES = {
   form: 'flex flex-col gap-3',
   header: 'flex items-center justify-between gap-2',
-  headerLeft: 'flex items-center gap-2',
+  footer: 'flex justify-end pt-1',
+
   date: 'text-sm font-semibold text-foreground',
   submit:
-    'text-sm font-semibold text-accent transition-opacity hover:opacity-70 disabled:opacity-40',
+    'shrink-0 rounded-md bg-subtle px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-border disabled:opacity-40',
   ddWrap: 'relative',
   ddBtn:
     'flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-sm text-foreground transition-colors hover:bg-subtle',
@@ -172,12 +173,7 @@ export function ManualRecordForm({
   return (
     <form className={STYLES.form} onSubmit={handleSubmit(onSubmit)}>
       <div className={STYLES.header}>
-        <div className={STYLES.headerLeft}>
-          <span className={STYLES.date}>{dateText}</span>
-          <button type="submit" disabled={isSubmitting} className={STYLES.submit}>
-            {isSubmitting ? '저장 중…' : '등록하기'}
-          </button>
-        </div>
+        <span className={STYLES.date}>{dateText}</span>
         <TypeSelect value={type} onChange={(t) => setValue('type', t)} />
       </div>
 
@@ -236,6 +232,12 @@ export function ManualRecordForm({
 
       {errors.name && <p className={STYLES.err}>{errors.name.message}</p>}
       {serverError && <p className={STYLES.err}>{serverError}</p>}
+
+      <div className={STYLES.footer}>
+        <button type="submit" disabled={isSubmitting} className={STYLES.submit}>
+          {isSubmitting ? '저장 중…' : '등록하기'}
+        </button>
+      </div>
     </form>
   );
 }
