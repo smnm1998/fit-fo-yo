@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn';
 import { logout } from '@/lib/client/auth-api';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useUiStore } from '@/lib/store/ui-store';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const NAV = [
   { href: '/dashboard', label: '캘린더', Icon: CalendarDays },
@@ -152,54 +153,67 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* 하단: 계정 */}
+        {/* 하단: 계정 위젯 + 다크 토글 */}
         <div className={STYLES.bottom}>
-          <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>
-            <Popover.Trigger asChild>
-              <button
-                type="button"
-                className={cn(STYLES.account, collapsed && 'md:justify-center')}
-              >
-                <span className={STYLES.avatar}>
-                  <User size={18} />
-                </span>
-                <span className={cn(STYLES.accountInfo, collapsed && 'md:hidden')}>
-                  <span className={STYLES.accountName}>{displayName}</span>
-                  {user?.email && <span className={STYLES.accountEmail}>{user.email}</span>}
-                </span>
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                side="top"
-                align="start"
-                sideOffset={8}
-                collisionPadding={12}
-                className={STYLES.menu}
-              >
+          <div
+            className={cn(
+              'flex items-center gap-1',
+              collapsed && 'md:flex-col-reverse md:items-center',
+            )}
+          >
+            <Popover.Root open={menuOpen} onOpenChange={setMenuOpen}>
+              <Popover.Trigger asChild>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setProfileOpen(true);
-                  }}
-                  className={cn(STYLES.menuItem, 'text-foreground')}
+                  className={cn(
+                    STYLES.account,
+                    'min-w-0 flex-1',
+                    collapsed && 'md:flex-none md:justify-center',
+                  )}
                 >
-                  <User size={16} className="shrink-0" /> 내 정보
+                  <span className={STYLES.avatar}>
+                    <User size={18} />
+                  </span>
+                  <span className={cn(STYLES.accountInfo, collapsed && 'md:hidden')}>
+                    <span className={STYLES.accountName}>{displayName}</span>
+                    {user?.email && <span className={STYLES.accountEmail}>{user.email}</span>}
+                  </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void onLogout();
-                  }}
-                  className={cn(STYLES.menuItem, 'text-danger')}
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  side="top"
+                  align="start"
+                  sideOffset={8}
+                  collisionPadding={12}
+                  className={STYLES.menu}
                 >
-                  <LogOut size={16} className="shrink-0" /> 로그아웃
-                </button>
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setProfileOpen(true);
+                    }}
+                    className={cn(STYLES.menuItem, 'text-foreground')}
+                  >
+                    <User size={16} className="shrink-0" /> 내 정보
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void onLogout();
+                    }}
+                    className={cn(STYLES.menuItem, 'text-danger')}
+                  >
+                    <LogOut size={16} className="shrink-0" /> 로그아웃
+                  </button>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+
+            <ThemeToggle />
+          </div>
 
           <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
         </div>
