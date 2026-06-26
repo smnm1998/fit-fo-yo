@@ -75,6 +75,11 @@ export function dateLabel(date: string): string {
   return `${Number(m)}월 ${Number(d)}일`;
 }
 
+/** 'YYYY-MM-DD' -> '6월 14일 (금)' (KST 요일) */
+export function dateLabelDow(date: string): string {
+  return formatInTimeZone(new Date(`${date}T12:00:00+09:00`), TZ, 'M월 d일 (EEE)', { locale: ko });
+}
+
 /** 지난 n일(오늘 포함)의 UTC 범위 */
 export function weekRangeKST(days = 7): { from: string; to: string } {
   const zonedNow = toZonedTime(new Date(), TZ);
