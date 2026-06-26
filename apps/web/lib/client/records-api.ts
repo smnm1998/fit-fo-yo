@@ -23,6 +23,12 @@ export type CreateRecordInput = {
   }[];
 };
 
+export type UpdateRecordInput = {
+  recordedAt?: string;
+  dietItems?: CreateRecordInput['dietItems'];
+  exerciseItems?: CreateRecordInput['exerciseItems'];
+};
+
 export function parseAndSave(rawInput: string, recordedAt?: string): Promise<RecordDto> {
   return request<RecordDto>('/api/ai/parse-and-save', {
     method: 'POST',
@@ -44,6 +50,14 @@ export function deleteRecord(id: string): Promise<void> {
 export function createRecord(input: CreateRecordInput): Promise<RecordDto> {
   return request<RecordDto>('/api/records', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateRecord(id: string, input: UpdateRecordInput): Promise<RecordDto> {
+  return request<RecordDto>(`/api/records/${id}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });

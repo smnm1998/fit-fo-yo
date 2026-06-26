@@ -18,7 +18,7 @@
   --muted: #9a9a9a;
   --subtle: #2e2e2e;
   --border: #383838;
-  --accent: #ededed; /* 라이트로 반전 → 아바타/버튼 대비 유지 */
+  --accent: #ededed;
   --danger: #f87171;
 }
 
@@ -31,4 +31,26 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-danger: var(--danger);
+}
+
+@theme {
+  --font-sans: var(--font-sans-kr), system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', monospace;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
 }

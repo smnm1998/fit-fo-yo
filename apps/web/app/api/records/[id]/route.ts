@@ -8,3 +8,15 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const data = await res.json().catch(() => null);
   return NextResponse.json(data, { status: res.status });
 }
+
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const body = await req.json();
+  const res = await apiFetchAuth(`/records/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => null);
+  return NextResponse.json(data, { status: res.status });
+}
