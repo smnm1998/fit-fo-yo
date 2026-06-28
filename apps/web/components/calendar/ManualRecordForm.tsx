@@ -8,6 +8,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { createRecord, ApiError, type CreateRecordInput } from '@/lib/client/records-api';
 import { useRecordsStore } from '@/lib/store/records-store';
+import { Button } from '@/components/ui/Button';
 
 const schema = z.object({
   type: z.enum(['DIET', 'EXERCISE']),
@@ -40,8 +41,6 @@ const STYLES = {
   footer: 'flex justify-end pt-1',
 
   date: 'text-sm font-semibold text-foreground',
-  submit:
-    'shrink-0 rounded-md bg-subtle px-2.5 py-1 text-xs font-semibold text-accent transition-colors hover:bg-border disabled:opacity-40',
   ddWrap: 'relative',
   ddBtn:
     'flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-sm text-foreground transition-colors hover:bg-subtle',
@@ -234,9 +233,9 @@ export function ManualRecordForm({
       {serverError && <p className={STYLES.err}>{serverError}</p>}
 
       <div className={STYLES.footer}>
-        <button type="submit" disabled={isSubmitting} className={STYLES.submit}>
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? '저장 중…' : '등록하기'}
-        </button>
+        </Button>
       </div>
     </form>
   );

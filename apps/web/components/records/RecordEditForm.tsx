@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { updateRecord, ApiError, type UpdateRecordInput } from '@/lib/client/records-api';
 import { useRecordsStore } from '@/lib/store/records-store';
 import type { RecordDto } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
 
 const MEALS = [
   { value: '', label: '식사 선택' },
@@ -28,8 +29,6 @@ const STYLES = {
   label: 'w-12 shrink-0 text-[11px] text-muted',
   input: 'w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted',
   actions: 'flex items-center justify-end gap-3 pt-1',
-  cancel: 'text-xs text-muted transition-colors hover:text-foreground',
-  save: 'text-xs font-semibold text-accent transition-opacity hover:opacity-70 disabled:opacity-40',
   err: 'text-[11px] text-danger',
 } as const;
 
@@ -179,12 +178,12 @@ export function RecordEditForm({
       {error && <p className={STYLES.err}>{error}</p>}
 
       <div className={STYLES.actions}>
-        <button type="button" className={STYLES.cancel} onClick={onCancel}>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
           취소
-        </button>
-        <button type="submit" disabled={saving} className={STYLES.save}>
+        </Button>
+        <Button type="submit" size="sm" disabled={saving}>
           {saving ? '저장 중…' : '저장'}
-        </button>
+        </Button>
       </div>
     </form>
   );
