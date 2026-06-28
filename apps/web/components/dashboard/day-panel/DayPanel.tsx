@@ -39,6 +39,7 @@ export function DayPanel({
     <DashboardView
       dateLabelText={dateLabelText}
       isToday={isToday}
+      recordedAt={recordedAt}
       totals={totals}
       dayRec={dayRec}
       dayRecords={dayRecords}
