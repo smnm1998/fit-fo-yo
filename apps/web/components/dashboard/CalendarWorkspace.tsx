@@ -22,9 +22,11 @@ import type { RecommendationDto, RecordDto } from '@/lib/types';
 
 const STYLES = {
   toolbar: 'flex items-center justify-between gap-3',
-  monthNav: 'flex items-center gap-0.5 rounded-full bg-accent p-0.5',
-  navBtn: 'rounded-full p-1 text-surface/60 transition-colors hover:bg-white/10 hover:text-surface',
-  month: 'min-w-[6rem] text-center text-sm font-semibold text-surface',
+  monthNav:
+    'flex items-center gap-0.5 rounded-full border border-border bg-foreground/15 p-0.5 backdrop-blur-sm',
+  navBtn:
+    'rounded-full p-1 text-muted transition-colors hover:bg-foreground/10 hover:text-foreground',
+  month: 'min-w-[6rem] text-center text-sm font-semibold text-foreground',
   splitGrid: 'grid gap-6 lg:grid-cols-[1fr_20rem]',
   skeleton: 'h-[22rem] animate-pulse rounded-2xl bg-subtle',
 } as const;
