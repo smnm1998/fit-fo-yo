@@ -6,6 +6,7 @@ import { dateLabel, dayNoonIsoKST } from '@/lib/date';
 import { ManualRecordForm } from '@/components/calendar/ManualRecordForm';
 import { RecordChip } from './RecordChip';
 import type { RecordDto } from '@/lib/types';
+import { POPOVER_SURFACE } from '@/components/ui/surface';
 
 const MAX_LINES = 3;
 
@@ -20,8 +21,7 @@ const STYLES = {
   numSelected: 'bg-accent font-semibold text-surface',
   lines: 'flex min-w-0 flex-col gap-0.5',
   more: 'text-[11px] leading-tight text-muted',
-  content:
-    'z-50 flex max-h-[80vh] w-80 flex-col gap-3 overflow-y-auto rounded-xl border border-border bg-surface p-4 shadow-lg origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-[popIn_120ms_ease-out]',
+  content: `z-50 flex max-h-[80vh] w-72 flex-col gap-3 overflow-y-auto p-4 ${POPOVER_SURFACE}`,
   arrow: 'fill-surface',
 } as const;
 

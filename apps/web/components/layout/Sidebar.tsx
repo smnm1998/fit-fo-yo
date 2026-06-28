@@ -182,8 +182,8 @@ export function Sidebar() {
               </Popover.Trigger>
               <Popover.Portal>
                 <Popover.Content
-                  side="top"
-                  align="start"
+                  side={collapsed ? 'right' : 'top'}
+                  align={collapsed ? 'end' : 'start'}
                   sideOffset={8}
                   collisionPadding={12}
                   className={STYLES.menu}

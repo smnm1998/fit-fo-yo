@@ -1,20 +1,30 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, Sparkles, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Plus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { deleteRecord } from '@/lib/client/records-api';
+import { MEAL_LABEL } from '@/lib/record-meta';
 import { useRecordsStore } from '@/lib/store/records-store';
 import type { DayTotals } from '@/lib/records';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
-import { RecordRow } from './RecordRow';
-import { RecordEditModal } from './RecordEditModal';
+import { RecordInfoModal } from './RecordInfoModal';
+import { AddRecordModal } from './AddRecordModal';
 
 const RECENT_LIMIT = 3;
 type Filter = 'DIET' | 'EXERCISE';
+const MEAL_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'ETC'] as const;
+
+type Entry = {
+  key: string;
+  title: string;
+  label: string;
+  summary: string;
+  kcal: number;
+  records: RecordDto[];
+};
 
 const STYLES = {
-  panel: 'flex h-full flex-col gap-4',
+  panel: 'flex h-full flex-col gap-4 animate-[viewInLeft_220ms_ease-out]',
   head: 'flex items-baseline gap-2',
   date: 'text-base font-bold text-foreground',
   today: 'rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-surface',
@@ -33,13 +43,13 @@ const STYLES = {
   seg: 'flex w-fit items-center gap-0.5 rounded-lg bg-subtle p-0.5',
   segBtn: 'rounded-md px-3 py-1 text-xs font-medium text-muted transition-colors',
   segActive: 'bg-surface text-foreground shadow-sm',
-  trashBtn: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-danger',
-  headActions: 'flex items-center gap-3',
-  headCancel: 'text-xs font-medium text-muted transition-colors hover:text-foreground',
-  headDel:
-    'text-xs font-semibold text-danger transition-opacity hover:opacity-70 disabled:opacity-40',
   rowList: 'flex flex-col gap-2',
-  empty: 'rounded-xl border border-dashed border-border px-3 py-6 text-center text-sm text-muted',
+  row: 'flex w-full items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-left transition-colors hover:border-accent/50 hover:bg-subtle',
+  rowLabel: 'max-w-[55%] truncate text-sm font-semibold text-foreground',
+  rowSummary: 'min-w-0 flex-1 truncate text-xs text-muted',
+  rowKcal: 'shrink-0 text-xs font-semibold tabular-nums text-foreground',
+  addRow:
+    'flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-xs font-medium text-muted opacity-70 transition-all hover:border-accent hover:bg-subtle hover:text-foreground hover:opacity-100',
   toggle:
     'mx-auto flex items-center gap-0.5 text-xs font-medium text-muted transition-colors hover:text-foreground',
   notice:
@@ -51,6 +61,7 @@ const STYLES = {
 type Props = {
   dateLabelText: string;
   isToday: boolean;
+  recordedAt: string;
   totals: DayTotals;
   dayRec: RecommendationDto | null;
   dayRecords: RecordDto[];
@@ -60,6 +71,7 @@ type Props = {
 export function DashboardView({
   dateLabelText,
   isToday,
+  recordedAt,
   totals,
   dayRec,
   dayRecords,
@@ -67,50 +79,55 @@ export function DashboardView({
 }: Props) {
   const [filter, setFilter] = useState<Filter>('DIET');
   const [expanded, setExpanded] = useState(false);
-  const [deleteMode, setDeleteMode] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editing, setEditing] = useState<RecordDto | null>(null);
+  const [infoKey, setInfoKey] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
   const notice = useRecordsStore((s) => s.notice);
   const setNotice = useRecordsStore((s) => s.setNotice);
-  const removeRecord = useRecordsStore((s) => s.removeRecord);
-  const restoreRecord = useRecordsStore((s) => s.restoreRecord);
 
-  const filtered = dayRecords.filter((r) => r.type === filter);
-  const shown = expanded ? filtered : filtered.slice(0, RECENT_LIMIT);
   const net = totals.calories - totals.caloriesBurned;
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  async function deleteSelected() {
-    const targets = dayRecords.filter((r) => selected.has(r.id));
-    if (targets.length === 0) return;
-    targets.forEach((r) => removeRecord(r.id));
-    setSelected(new Set());
-    setDeleteMode(false);
-
-    const failures = await Promise.all(
-      targets.map(async (r) => {
-        try {
-          await deleteRecord(r.id);
-          return null;
-        } catch {
-          return r;
-        }
-      }),
-    );
-    const failed = failures.filter((r): r is RecordDto => r !== null);
-    if (failed.length) {
-      failed.forEach((r) => restoreRecord(r));
-      setNotice('일부 기록을 삭제하지 못했어요.');
+  const entries = useMemo<Entry[]>(() => {
+    const filtered = dayRecords.filter((r) => r.type === filter);
+    if (filter === 'EXERCISE') {
+      return filtered.map((r) => {
+        const items = r.exerciseItems;
+        const kcal = items.reduce((s, it) => s + (it.caloriesBurned ?? 0), 0);
+        const first = items[0]?.name ?? '운동';
+        const dur = items[0]?.durationMinutes;
+        return {
+          key: `rec:${r.id}`,
+          title: first,
+          label: first,
+          summary: items.length > 1 ? `외 ${items.length - 1}개` : dur ? `${dur}분` : '',
+          kcal,
+          records: [r],
+        };
+      });
     }
-  }
+    const groups: Record<string, RecordDto[]> = {};
+    for (const r of filtered) {
+      const meal = r.dietItems[0]?.mealType ?? 'ETC';
+      (groups[meal] ??= []).push(r);
+    }
+    return MEAL_ORDER.filter((m) => groups[m]?.length).map((meal) => {
+      const recs = groups[meal] ?? [];
+      const items = recs.flatMap((r) => r.dietItems);
+      const kcal = items.reduce((s, it) => s + (it.calories ?? 0), 0);
+      const label = (MEAL_LABEL as Record<string, string>)[meal] ?? '기타';
+      const first = items[0]?.name ?? '';
+      return {
+        key: `meal:${meal}`,
+        title: label,
+        label,
+        summary: items.length > 1 ? `${first} 외 ${items.length - 1}개` : first,
+        kcal,
+        records: recs,
+      };
+    });
+  }, [dayRecords, filter]);
+
+  const shown = expanded ? entries : entries.slice(0, RECENT_LIMIT);
+  const infoEntry = entries.find((e) => e.key === infoKey) ?? null;
 
   return (
     <div className={STYLES.panel}>
@@ -148,7 +165,6 @@ export function DashboardView({
                 onClick={() => {
                   setFilter(f);
                   setExpanded(false);
-                  setSelected(new Set());
                 }}
                 className={cn(STYLES.segBtn, filter === f && STYLES.segActive)}
               >
@@ -156,57 +172,30 @@ export function DashboardView({
               </button>
             ))}
           </div>
-          {deleteMode ? (
-            <div className={STYLES.headActions}>
-              <button
-                type="button"
-                className={STYLES.headCancel}
-                onClick={() => {
-                  setDeleteMode(false);
-                  setSelected(new Set());
-                }}
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                className={STYLES.headDel}
-                onClick={() => void deleteSelected()}
-                disabled={selected.size === 0}
-              >
-                삭제{selected.size > 0 ? ` ${selected.size}` : ''}
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className={STYLES.trashBtn}
-              onClick={() => setDeleteMode(true)}
-              aria-label="삭제 모드"
-            >
-              <Trash2 size={15} />
-            </button>
-          )}
         </div>
 
-        {filtered.length === 0 ? (
-          <p className={STYLES.empty}>{filter === 'DIET' ? '식단' : '운동'} 기록이 없어요.</p>
-        ) : (
-          <div className={STYLES.rowList}>
-            {shown.map((r) => (
-              <RecordRow
-                key={r.id}
-                record={r}
-                deleteMode={deleteMode}
-                selected={selected.has(r.id)}
-                onToggle={() => toggleSelect(r.id)}
-                onEdit={() => setEditing(r)}
-              />
-            ))}
-          </div>
-        )}
+        <div className={STYLES.rowList}>
+          {shown.map((e) => (
+            <button
+              key={e.key}
+              type="button"
+              className={STYLES.row}
+              onClick={() => setInfoKey(e.key)}
+            >
+              <span className={STYLES.rowLabel}>{e.label}</span>
+              {e.summary && <span className={STYLES.rowSummary}>{e.summary}</span>}
+              {e.kcal > 0 && <span className={STYLES.rowKcal}>{e.kcal.toLocaleString()} kcal</span>}
+            </button>
+          ))}
+          <button type="button" className={STYLES.addRow} onClick={() => setAddOpen(true)}>
+            <Plus size={15} />
+            {entries.length === 0
+              ? `${filter === 'DIET' ? '식단' : '운동'} 기록 추가하기`
+              : '추가하기'}
+          </button>
+        </div>
 
-        {filtered.length > RECENT_LIMIT && (
+        {entries.length > RECENT_LIMIT && (
           <button type="button" className={STYLES.toggle} onClick={() => setExpanded((v) => !v)}>
             {expanded ? (
               <>
@@ -214,7 +203,7 @@ export function DashboardView({
               </>
             ) : (
               <>
-                더보기 ({filtered.length}) <ChevronDown size={14} />
+                더보기 ({entries.length}) <ChevronDown size={14} />
               </>
             )}
           </button>
@@ -234,7 +223,20 @@ export function DashboardView({
         <Sparkles size={16} /> AI로 입력하기
       </button>
 
-      {editing && <RecordEditModal record={editing} onClose={() => setEditing(null)} />}
+      {infoEntry && (
+        <RecordInfoModal
+          title={infoEntry.title}
+          records={infoEntry.records}
+          onClose={() => setInfoKey(null)}
+        />
+      )}
+      {addOpen && (
+        <AddRecordModal
+          recordedAt={recordedAt}
+          dateText={dateLabelText}
+          onClose={() => setAddOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -8,11 +8,11 @@ import { RECORD_TYPE_META, MEAL_LABEL, recordName } from '@/lib/record-meta';
 import { useDeleteRecord } from '@/lib/hooks/useDeleteRecord';
 import { RecordEditForm } from '@/components/records/RecordEditForm';
 import type { RecordDto } from '@/lib/types';
+import { POPOVER_SURFACE } from '@/components/ui/surface';
 
 const STYLES = {
   chip: 'pointer-events-auto block w-full truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight transition-colors',
-  content:
-    'z-50 flex max-h-[70vh] w-64 flex-col gap-2 overflow-y-auto rounded-xl border border-border bg-surface p-3 shadow-lg origin-[var(--radix-popover-content-transform-origin)] data-[state=open]:animate-[popIn_120ms_ease-out]',
+  content: `z-50 flex max-h-[70vh] w-64 flex-col gap-2 overflow-y-auto p-3 ${POPOVER_SURFACE}`,
   arrow: 'fill-surface',
   head: 'flex items-center gap-1.5',
   dot: 'h-2.5 w-2.5 shrink-0 rounded-full',
