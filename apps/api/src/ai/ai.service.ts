@@ -15,6 +15,9 @@ import {
   type ParsedResult,
 } from './schemas/function-schemas';
 
+/** 체중 미상 사용자 기본값. HealthProfile 연동 시 대체 예정. */
+const DEFAULT_WEIGHT_KG = 65;
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -92,7 +95,7 @@ export class AiService {
           mealType: item.mealType || undefined,
           quantity: item.quantity,
           unit: item.unit,
-          calories: item.calories,
+          calories: this.resolveCalories(item),
           carbs: item.carbs,
           protein: item.protein,
           fat: item.fat,
@@ -111,7 +114,7 @@ export class AiService {
         name: item.name,
         durationMinutes: item.durationMinutes,
         intensity: item.intensity,
-        caloriesBurned: item.caloriesBurned,
+        caloriesBurned: this.resolveCaloriesBurned(item),
         estimated: item.estimated,
       })),
     });
@@ -123,6 +126,45 @@ export class AiService {
     } catch {
       throw new InternalServerErrorException('AI 응답 JSON 파싱 실패');
     }
+  }
+
+  /**
+   * 칼로리는 LLM 산수를 신뢰하지 않고 서버에서 재계산한다.
+   * 근거값(100g당 kcal, 환산 그램)이 없으면 LLM 값으로 폴백.
+   */
+  private resolveCalories(item: {
+    caloriesPer100g?: number;
+    gramsEstimate?: number;
+    calories?: number;
+  }): number | undefined {
+    const { caloriesPer100g, gramsEstimate } = item;
+    if (
+      typeof caloriesPer100g === 'number' &&
+      typeof gramsEstimate === 'number' &&
+      caloriesPer100g >= 0 &&
+      gramsEstimate > 0
+    ) {
+      return Math.round((caloriesPer100g * gramsEstimate) / 100);
+    }
+    return item.calories;
+  }
+
+  /** 소모 칼로리 = MET × 3.5 × 체중(kg) / 200 × 분 */
+  private resolveCaloriesBurned(item: {
+    met?: number;
+    durationMinutes?: number;
+    caloriesBurned?: number;
+  }): number | undefined {
+    const { met, durationMinutes } = item;
+    if (
+      typeof met === 'number' &&
+      typeof durationMinutes === 'number' &&
+      met > 0 &&
+      durationMinutes > 0
+    ) {
+      return Math.round(((met * 3.5 * DEFAULT_WEIGHT_KG) / 200) * durationMinutes);
+    }
+    return item.caloriesBurned;
   }
 
   private resolveRecordedAt(fromAi: string | undefined, fallback: string | undefined): Date {

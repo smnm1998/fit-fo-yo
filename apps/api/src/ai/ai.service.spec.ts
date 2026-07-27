@@ -144,4 +144,27 @@ describe('AiService', () => {
       expect(arg.recordedAt).toEqual(new Date('2026-05-31T08:00:00+09:00'));
     });
   });
+
+  it('calories 를 caloriesPer100g × gramsEstimate 로 재계산한다', async () => {
+    openai.chatWithTools.mockResolvedValue(
+      toolCallResponse('record_diet', {
+        items: [
+          {
+            name: '김치찌개',
+            quantity: 1,
+            unit: '인분',
+            gramsEstimate: 400,
+            caloriesPer100g: 55,
+            calories: 999, // LLM 이 잘못 계산한 값
+            estimated: true,
+          },
+        ],
+      }),
+    );
+
+    await service.parseAndSave({ userId: 'u1', rawInput: '김치찌개' });
+
+    const arg = records.createFromParsed.mock.calls[0][0];
+    expect(arg.dietItems[0].calories).toBe(220); // 55 × 400 / 100
+  });
 });
