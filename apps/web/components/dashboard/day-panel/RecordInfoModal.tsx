@@ -14,6 +14,8 @@ const STYLES = {
   card: 'flex flex-col gap-2 rounded-xl border border-border p-3',
   itemRow: 'flex items-center justify-between gap-2 text-sm',
   itemName: 'min-w-0 truncate text-foreground',
+  itemRight: 'flex shrink-0 items-center gap-1.5',
+  estBadge: 'rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted',
   itemMetric: 'shrink-0 tabular-nums text-muted',
   actions: 'flex justify-end gap-1 pt-1',
 } as const;
@@ -51,9 +53,12 @@ export function RecordInfoModal({
                         {it.name}
                         {it.mealType ? ` · ${MEAL_LABEL[it.mealType] ?? it.mealType}` : ''}
                       </span>
-                      {typeof it.calories === 'number' && (
-                        <span className={STYLES.itemMetric}>{it.calories} kcal</span>
-                      )}
+                      <span className={STYLES.itemRight}>
+                        {it.estimated && <span className={STYLES.estBadge}>추정</span>}
+                        {typeof it.calories === 'number' && (
+                          <span className={STYLES.itemMetric}>{it.calories} kcal</span>
+                        )}
+                      </span>
                     </div>
                   ))
                 : record.exerciseItems.map((it) => (
@@ -62,9 +67,12 @@ export function RecordInfoModal({
                         {it.name}
                         {it.durationMinutes ? ` · ${it.durationMinutes}분` : ''}
                       </span>
-                      {typeof it.caloriesBurned === 'number' && (
-                        <span className={STYLES.itemMetric}>{it.caloriesBurned} kcal</span>
-                      )}
+                      <span className={STYLES.itemRight}>
+                        {it.estimated && <span className={STYLES.estBadge}>추정</span>}
+                        {typeof it.caloriesBurned === 'number' && (
+                          <span className={STYLES.itemMetric}>{it.caloriesBurned} kcal</span>
+                        )}
+                      </span>
                     </div>
                   ))}
               <div className={STYLES.actions}>
