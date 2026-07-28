@@ -49,10 +49,11 @@ export function CalendarGrid({ month, records, selectedDate, onSelect }: Calenda
         ))}
       </div>
       <div className={STYLES.grid}>
-        {days.map((date) => (
+        {days.map((date, i) => (
           <DayCell
             key={date}
             date={date}
+            weekday={i % 7}
             inMonth={date.slice(0, 7) === month}
             isToday={date === today}
             isSelected={date === selectedDate}

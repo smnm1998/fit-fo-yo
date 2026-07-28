@@ -9,9 +9,25 @@ const dietItemSchema = {
       enum: ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'],
       description: '식사 시점',
     },
-    quantity: { type: 'number', description: '수량 (예: 200)' },
-    unit: { type: 'string', description: '단위 (예: g, ml, 개)' },
-    calories: { type: 'integer', description: '칼로리 (kcal)' },
+    quantity: { type: 'number', description: '사용자 표현 기준 수량 (예: 1, 200)' },
+    unit: {
+      type: 'string',
+      enum: ['g', 'ml', '개', '공기', '인분', '컵', '조각', '스푼'],
+      description: '수량 단위. 사용자 표현에 가장 가까운 것.',
+    },
+    gramsEstimate: {
+      type: 'number',
+      description: '위 수량을 그램(g)으로 환산한 값. 예: 김치찌개 1인분 → 400',
+    },
+    caloriesPer100g: {
+      type: 'number',
+      description: '해당 음식 100g당 칼로리(kcal). 일반적인 조리 기준.',
+    },
+    calories: {
+      type: 'integer',
+      description:
+        '총 칼로리. 반드시 round(caloriesPer100g × gramsEstimate / 100) 과 일치해야 합니다.',
+    },
     carbs: { type: 'number', description: '탄수화물 (g)' },
     protein: { type: 'number', description: '단백질 (g)' },
     fat: { type: 'number', description: '지방 (g)' },
@@ -20,7 +36,15 @@ const dietItemSchema = {
       description: 'AI가 추정한 값이면 true, 사용자가 명시한 값 기반이면 false',
     },
   },
-  required: ['name', 'estimated'],
+  required: [
+    'name',
+    'quantity',
+    'unit',
+    'gramsEstimate',
+    'caloriesPer100g',
+    'calories',
+    'estimated',
+  ],
   additionalProperties: false,
 } as const;
 
@@ -29,14 +53,26 @@ const exerciseItemSchema = {
   properties: {
     name: { type: 'string', description: '운동명' },
     durationMinutes: { type: 'integer', description: '운동 시간 (분)' },
-    intensity: { type: 'string', description: '강도 (예: 가볍게, 적당히, 격하게)' },
-    caloriesBurned: { type: 'integer', description: '소모 칼로리 (kcal)' },
+    intensity: {
+      type: 'string',
+      enum: ['가볍게', '적당히', '격하게'],
+      description: '강도',
+    },
+    met: {
+      type: 'number',
+      description: '운동 강도 계수(MET). 예: 걷기 3.5, 조깅 7, 달리기 10, 웨이트 5, 수영 8',
+    },
+    caloriesBurned: {
+      type: 'integer',
+      description:
+        '소모 칼로리. 반드시 round(met × 3.5 × 65 / 200 × durationMinutes) 과 일치 (체중 65kg 가정).',
+    },
     estimated: {
       type: 'boolean',
       description: 'AI가 추정한 값이면 true, 사용자가 명시한 값 기반이면 false',
     },
   },
-  required: ['name', 'estimated'],
+  required: ['name', 'durationMinutes', 'met', 'caloriesBurned', 'estimated'],
   additionalProperties: false,
 } as const;
 
@@ -115,6 +151,8 @@ export type ParsedDietPayload = {
     mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
     quantity?: number;
     unit?: string;
+    gramsEstimate?: number;
+    caloriesPer100g?: number;
     calories?: number;
     carbs?: number;
     protein?: number;
@@ -129,6 +167,7 @@ export type ParsedExercisePayload = {
     name: string;
     durationMinutes?: number;
     intensity?: string;
+    met?: number;
     caloriesBurned?: number;
     estimated: boolean;
   }>;

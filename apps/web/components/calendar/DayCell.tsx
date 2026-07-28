@@ -27,6 +27,7 @@ const STYLES = {
 
 type DayCellProps = {
   date: string;
+  weekday: number; // 0=일 … 6=토
   inMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
@@ -34,8 +35,18 @@ type DayCellProps = {
   onSelect: (date: string) => void;
 };
 
-export function DayCell({ date, inMonth, isToday, isSelected, records, onSelect }: DayCellProps) {
+export function DayCell({
+  date,
+  weekday,
+  inMonth,
+  isToday,
+  isSelected,
+  records,
+  onSelect,
+}: DayCellProps) {
   const day = Number(date.slice(8, 10));
+  // 오른쪽 2개 열(금·토)은 왼쪽으로 열어 우측 DayPanel 가림 방지, 나머지는 오른쪽
+  const popoverSide = weekday >= 5 ? 'left' : 'right';
 
   if (!inMonth) {
     return (
@@ -62,7 +73,7 @@ export function DayCell({ date, inMonth, isToday, isSelected, records, onSelect 
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            side="right"
+            side={popoverSide}
             align="start"
             sideOffset={8}
             collisionPadding={12}

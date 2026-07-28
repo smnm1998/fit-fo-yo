@@ -127,7 +127,22 @@ export function DashboardView({
   }, [dayRecords, filter]);
 
   const shown = expanded ? entries : entries.slice(0, RECENT_LIMIT);
-  const infoEntry = entries.find((e) => e.key === infoKey) ?? null;
+  const dietRecords = useMemo(() => dayRecords.filter((r) => r.type === 'DIET'), [dayRecords]);
+  const info = useMemo(() => {
+    if (!infoKey) return null;
+    if (infoKey.startsWith('diet:')) {
+      if (dietRecords.length === 0) return null;
+      return { records: dietRecords, tabs: true, defaultMeal: infoKey.slice(5), title: '식단' };
+    }
+    const rec = dayRecords.find((r) => r.id === infoKey.slice(4));
+    if (!rec) return null;
+    return {
+      records: [rec],
+      tabs: false,
+      defaultMeal: undefined,
+      title: rec.exerciseItems[0]?.name ?? '운동',
+    };
+  }, [infoKey, dietRecords, dayRecords]);
 
   return (
     <div className={STYLES.panel}>
@@ -150,8 +165,9 @@ export function DashboardView({
       </div>
 
       <div className={STYLES.totals}>
-        <Stat label="섭취" value={totals.calories} color="text-emerald-600" />
-        <Stat label="소모" value={totals.caloriesBurned} color="text-sky-600" />
+        <Stat label="섭취" value={totals.calories} color="text-emerald-600 dark:text-emerald-400" />
+        <Stat label="소모" value={totals.caloriesBurned} color="text-sky-600 dark:text-sky-400" />
+
         <Stat label="순" value={net} color="text-foreground" />
       </div>
 
@@ -180,7 +196,7 @@ export function DashboardView({
               key={e.key}
               type="button"
               className={STYLES.row}
-              onClick={() => setInfoKey(e.key)}
+              onClick={() => setInfoKey(filter === 'DIET' ? `diet:${e.key.slice(5)}` : e.key)}
             >
               <span className={STYLES.rowLabel}>{e.label}</span>
               {e.summary && <span className={STYLES.rowSummary}>{e.summary}</span>}
@@ -223,13 +239,16 @@ export function DashboardView({
         <Sparkles size={16} /> AI로 입력하기
       </button>
 
-      {infoEntry && (
+      {info && (
         <RecordInfoModal
-          title={infoEntry.title}
-          records={infoEntry.records}
+          records={info.records}
+          tabs={info.tabs}
+          defaultMeal={info.defaultMeal}
+          title={info.title}
           onClose={() => setInfoKey(null)}
         />
       )}
+
       {addOpen && (
         <AddRecordModal
           recordedAt={recordedAt}

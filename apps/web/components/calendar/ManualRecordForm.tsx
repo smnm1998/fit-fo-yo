@@ -233,7 +233,7 @@ export function ManualRecordForm({
       {serverError && <p className={STYLES.err}>{serverError}</p>}
 
       <div className={STYLES.footer}>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" size="sm" disabled={isSubmitting}>
           {isSubmitting ? '저장 중…' : '등록하기'}
         </Button>
       </div>
