@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { Providers } from './providers';
 
 const pretendard = localFont({
   src: './fonts/IBMPlexSansKR-Medium.woff2',
@@ -16,8 +17,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="ko">
-      <body className={pretendard.variable}>{children}</body>
+    <html lang="ko" suppressHydrationWarning>
+      <body className={pretendard.variable}>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
