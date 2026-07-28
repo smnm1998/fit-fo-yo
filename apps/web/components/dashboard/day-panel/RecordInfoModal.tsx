@@ -1,90 +1,127 @@
 'use client';
 
-import { useState } from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Utensils, Dumbbell } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { MEAL_LABEL } from '@/lib/record-meta';
-import { useDeleteRecord } from '@/lib/hooks/useDeleteRecord';
-import { RecordEditForm } from '@/components/records/RecordEditForm';
+import { RECORD_TYPE_META } from '@/lib/record-meta';
 import type { RecordDto } from '@/lib/types';
+import { MEAL_ORDER, MEAL_TAB_LABEL } from './record-info/record-info-utils';
+import { useRecordEditor } from './record-info/useRecordEditor';
+import { RecordViewCard, RecordEditCard } from './record-info/RecordCards';
+
+const TYPE_ICON = { DIET: Utensils, EXERCISE: Dumbbell } as const;
 
 const STYLES = {
-  list: 'flex flex-col gap-3',
-  card: 'flex flex-col gap-2 rounded-xl border border-border p-3',
-  itemRow: 'flex items-center justify-between gap-2 text-sm',
-  itemName: 'min-w-0 truncate text-foreground',
-  itemRight: 'flex shrink-0 items-center gap-1.5',
-  estBadge: 'rounded-full border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted',
-  itemMetric: 'shrink-0 tabular-nums text-muted',
-  actions: 'flex justify-end gap-1 pt-1',
+  toolbar: 'flex items-center justify-between gap-2',
+  tabBar: 'flex w-fit gap-1 rounded-lg bg-subtle p-0.5',
+  tabBtn: 'rounded-md px-3 py-1 text-xs font-medium text-muted transition-colors',
+  tabActive: 'bg-surface text-foreground shadow-sm',
+  editHint: 'text-xs font-medium text-muted',
+  empty: 'py-8 text-center text-sm text-muted',
+  list: 'flex flex-col gap-2',
+  err: 'text-[11px] text-danger',
 } as const;
 
 export function RecordInfoModal({
-  title,
   records,
+  tabs,
+  defaultMeal,
+  title,
   onClose,
 }: {
-  title: string;
   records: RecordDto[];
+  tabs: boolean;
+  defaultMeal?: string;
+  title: string;
   onClose: () => void;
 }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const deleteOne = useDeleteRecord();
+  const byMeal = useMemo(() => {
+    const m: Record<string, RecordDto[]> = {};
+    for (const r of records) {
+      const key = r.dietItems[0]?.mealType ?? 'ETC';
+      (m[key] ??= []).push(r);
+    }
+    return m;
+  }, [records]);
+
+  const availMeals = MEAL_ORDER.filter((k) => byMeal[k]?.length);
+  const [tab, setTab] = useState<string>(
+    defaultMeal && (MEAL_ORDER as readonly string[]).includes(defaultMeal)
+      ? defaultMeal
+      : (availMeals[0] ?? 'BREAKFAST'),
+  );
+  const shown = tabs ? (byMeal[tab] ?? []) : records;
+
+  const ed = useRecordEditor();
+
+  const type = records[0]?.type ?? 'DIET';
+  const Icon = TYPE_ICON[type];
+  const titleIcon = <Icon size={18} className={cn('shrink-0', RECORD_TYPE_META[type].value)} />;
+
+  const left = ed.editing ? (
+    <span className={STYLES.editHint}>편집 중{tabs ? ` · ${MEAL_TAB_LABEL[tab]}` : ''}</span>
+  ) : tabs ? (
+    <div className={STYLES.tabBar}>
+      {MEAL_ORDER.map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => setTab(m)}
+          className={cn(STYLES.tabBtn, tab === m && STYLES.tabActive)}
+        >
+          {MEAL_TAB_LABEL[m]}
+        </button>
+      ))}
+    </div>
+  ) : (
+    <span />
+  );
+
+  const right = ed.editing ? (
+    <div className="flex items-center gap-1">
+      <Button variant="ghost" size="sm" onClick={ed.cancel} disabled={ed.saving}>
+        취소
+      </Button>
+      <Button variant="primary" size="sm" onClick={() => void ed.saveAll()} disabled={ed.saving}>
+        {ed.saving ? '저장 중…' : '저장'}
+      </Button>
+    </div>
+  ) : shown.length > 0 ? (
+    <Button variant="ghost" size="sm" onClick={() => ed.start(shown)}>
+      편집
+    </Button>
+  ) : (
+    <span />
+  );
 
   return (
-    <Modal open onClose={onClose} title={title} size="md">
+    <Modal open onClose={onClose} title={title} titleIcon={titleIcon} size="md">
+      <div className={STYLES.toolbar}>
+        {left}
+        {right}
+      </div>
+
+      {ed.error && <p className={STYLES.err}>{ed.error}</p>}
+
       <div className={STYLES.list}>
-        {records.map((record) =>
-          editingId === record.id ? (
-            <div key={record.id} className={STYLES.card}>
-              <RecordEditForm
-                record={record}
-                onSaved={() => setEditingId(null)}
-                onCancel={() => setEditingId(null)}
-              />
-            </div>
-          ) : (
-            <div key={record.id} className={STYLES.card}>
-              {record.type === 'DIET'
-                ? record.dietItems.map((it) => (
-                    <div key={it.id} className={STYLES.itemRow}>
-                      <span className={STYLES.itemName}>
-                        {it.name}
-                        {it.mealType ? ` · ${MEAL_LABEL[it.mealType] ?? it.mealType}` : ''}
-                      </span>
-                      <span className={STYLES.itemRight}>
-                        {it.estimated && <span className={STYLES.estBadge}>추정</span>}
-                        {typeof it.calories === 'number' && (
-                          <span className={STYLES.itemMetric}>{it.calories} kcal</span>
-                        )}
-                      </span>
-                    </div>
-                  ))
-                : record.exerciseItems.map((it) => (
-                    <div key={it.id} className={STYLES.itemRow}>
-                      <span className={STYLES.itemName}>
-                        {it.name}
-                        {it.durationMinutes ? ` · ${it.durationMinutes}분` : ''}
-                      </span>
-                      <span className={STYLES.itemRight}>
-                        {it.estimated && <span className={STYLES.estBadge}>추정</span>}
-                        {typeof it.caloriesBurned === 'number' && (
-                          <span className={STYLES.itemMetric}>{it.caloriesBurned} kcal</span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
-              <div className={STYLES.actions}>
-                <Button variant="ghost" size="sm" onClick={() => setEditingId(record.id)}>
-                  <Pencil size={14} /> 수정
-                </Button>
-                <Button variant="danger" size="sm" onClick={() => void deleteOne(record)}>
-                  <Trash2 size={14} /> 삭제
-                </Button>
-              </div>
-            </div>
-          ),
+        {ed.editing ? (
+          ed.drafts.map((d) => (
+            <RecordEditCard
+              key={d.record.id}
+              draft={d}
+              confirming={ed.confirmId === d.record.id}
+              onPatch={(i, key, value) => ed.patch(d.record.id, i, key, value)}
+              onArm={() => ed.setConfirmId(d.record.id)}
+              onCancelConfirm={() => ed.setConfirmId(null)}
+              onDelete={() => void ed.remove(d.record)}
+            />
+          ))
+        ) : shown.length === 0 ? (
+          <p className={STYLES.empty}>이 끼니에는 아직 기록이 없어요.</p>
+        ) : (
+          shown.map((record) => <RecordViewCard key={record.id} record={record} />)
         )}
       </div>
     </Modal>

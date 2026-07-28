@@ -17,7 +17,8 @@ const STYLES = {
   panel:
     'flex max-h-[85vh] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl ring-1 ring-black/5',
   head: 'flex items-center justify-between gap-2',
-  title: 'text-base font-bold text-foreground',
+  titleWrap: 'flex min-w-0 items-center gap-2',
+  title: 'truncate text-base font-bold text-foreground',
   close: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground',
 } as const;
 
@@ -25,11 +26,12 @@ type Props = {
   open: boolean;
   onClose: () => void;
   title: string;
+  titleIcon?: ReactNode;
   size?: keyof typeof SIZE;
   children: ReactNode;
 };
 
-export function Modal({ open, onClose, title, size = 'sm', children }: Props) {
+export function Modal({ open, onClose, title, titleIcon, size = 'sm', children }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={(o) => !o && onClose()}>
       <Dialog.Portal>
@@ -37,7 +39,10 @@ export function Modal({ open, onClose, title, size = 'sm', children }: Props) {
         <Dialog.Content className={STYLES.content}>
           <div className={cn(STYLES.panel, SIZE[size])}>
             <div className={STYLES.head}>
-              <Dialog.Title className={STYLES.title}>{title}</Dialog.Title>
+              <div className={STYLES.titleWrap}>
+                {titleIcon}
+                <Dialog.Title className={STYLES.title}>{title}</Dialog.Title>
+              </div>
               <Dialog.Close asChild>
                 <button type="button" aria-label="닫기" className={STYLES.close}>
                   <X size={18} />
