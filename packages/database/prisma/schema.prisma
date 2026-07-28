@@ -112,3 +112,12 @@ model HealthProfile {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+model FoodNutrition {
+  id              Int      @id @default(autoincrement())
+  name            String   @unique // 정규화된 음식명 (소문자·공백제거)
+  caloriesPer100g Int
+  gramsPerServing Int // 1인분(개/공기/봉지) 대표 그램수
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
