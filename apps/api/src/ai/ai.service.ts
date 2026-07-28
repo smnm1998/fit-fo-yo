@@ -14,6 +14,8 @@ import {
   type ParsedExercisePayload,
   type ParsedResult,
 } from './schemas/function-schemas';
+import type { FoodNutrition } from '@fitfoyo/database';
+import { NutritionService, normalizeFoodName } from '../nutrition/nutrition.service';
 
 /** 체중 미상 사용자 기본값. HealthProfile 연동 시 대체 예정. */
 const DEFAULT_WEIGHT_KG = 65;
@@ -25,6 +27,7 @@ export class AiService {
   constructor(
     private readonly openai: OpenAIClient,
     private readonly records: RecordsService,
+    private readonly nutrition: NutritionService,
   ) {}
 
   /**
@@ -84,23 +87,29 @@ export class AiService {
     );
 
     if (parsed.kind === 'diet') {
+      const items = parsed.payload.items;
+      const table = await this.nutrition.lookupMany(items.map((i) => i.name));
+
       return this.records.createFromParsed({
         userId: params.userId,
         type: RecordType.DIET,
         rawInput: params.rawInput,
         parsedJson: parsed.payload as unknown as Prisma.InputJsonValue,
         recordedAt,
-        dietItems: parsed.payload.items.map((item) => ({
-          name: item.name,
-          mealType: item.mealType || undefined,
-          quantity: item.quantity,
-          unit: item.unit,
-          calories: this.resolveCalories(item),
-          carbs: item.carbs,
-          protein: item.protein,
-          fat: item.fat,
-          estimated: item.estimated,
-        })),
+        dietItems: items.map((item) => {
+          const grounded = this.groundCalories(item, table);
+          return {
+            name: item.name,
+            mealType: item.mealType || undefined,
+            quantity: item.quantity,
+            unit: item.unit,
+            calories: grounded.calories,
+            carbs: item.carbs,
+            protein: item.protein,
+            fat: item.fat,
+            estimated: grounded.estimated,
+          };
+        }),
       });
     }
 
@@ -126,6 +135,42 @@ export class AiService {
     } catch {
       throw new InternalServerErrorException('AI 응답 JSON 파싱 실패');
     }
+  }
+
+  /**
+   * 등록 음식이면 DB 근거값으로 확정(estimated=false), 미등록이면 LLM 재계산 폴백.
+   */
+  private groundCalories(
+    item: {
+      name: string;
+      unit?: string;
+      quantity?: number;
+      gramsEstimate?: number;
+      caloriesPer100g?: number;
+      calories?: number;
+      estimated: boolean;
+    },
+    table: Map<string, FoodNutrition>,
+  ): { calories?: number; estimated: boolean } {
+    const hit = table.get(normalizeFoodName(item.name));
+    if (hit) {
+      const grams = this.resolveGrams(item, hit.gramsPerServing);
+      return { calories: Math.round((hit.caloriesPer100g * grams) / 100), estimated: false };
+    }
+    return { calories: this.resolveCalories(item), estimated: item.estimated };
+  }
+
+  /** g/ml 로 무게를 직접 준 경우만 LLM grams 신뢰, 아니면 DB 대표 그램수 × 수량 */
+  private resolveGrams(
+    item: { unit?: string; quantity?: number; gramsEstimate?: number },
+    gramsPerServing: number,
+  ): number {
+    const { unit, quantity, gramsEstimate } = item;
+    if ((unit === 'g' || unit === 'ml') && typeof gramsEstimate === 'number' && gramsEstimate > 0) {
+      return gramsEstimate;
+    }
+    const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+    return qty * gramsPerServing;
   }
 
   /**
