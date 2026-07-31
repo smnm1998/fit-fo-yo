@@ -10,16 +10,20 @@ export type CreateRecordInput = {
   dietItems?: {
     name: string;
     mealType?: string;
+    quantity?: number;
+    unit?: string;
     calories?: number;
     carbs?: number;
     protein?: number;
     fat?: number;
+    estimated?: boolean;
   }[];
   exerciseItems?: {
     name: string;
     durationMinutes?: number;
     caloriesBurned?: number;
     intensity?: string;
+    estimated?: boolean;
   }[];
 };
 
