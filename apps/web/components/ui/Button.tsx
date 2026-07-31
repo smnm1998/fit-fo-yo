@@ -9,8 +9,9 @@ const button = cva(
       variant: {
         primary: 'bg-accent text-surface hover:opacity-90',
         ghost: 'bg-transparent text-muted hover:bg-subtle hover:text-foreground',
-        danger: 'bg-transparent text-danger hover:bg-danger/10',
+        danger: 'bg-danger text-white hover:opacity-90',
       },
+
       size: {
         sm: 'h-8 px-3 text-xs',
         md: 'h-10 px-4 text-base',
