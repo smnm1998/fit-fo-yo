@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { GuestCleanupService } from './guest-cleanup.service';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { OAuthTicketService } from './oauth-ticket.service';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
     PasswordService,
     AuthService,
     GuestCleanupService,
+    OAuthTicketService,
   ],
   exports: [PasswordService],
 })

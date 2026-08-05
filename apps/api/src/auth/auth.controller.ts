@@ -7,8 +7,12 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
+import { OAuthTicketService } from './oauth-ticket.service';
+import { OAuthExchangeDto } from './dto/oauth-exchange.dto';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
@@ -18,7 +22,6 @@ import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
-import { Logger } from '@nestjs/common';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import type { GoogleAuthUser } from './strategies/google.strategy';
 
@@ -31,6 +34,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly config: ConfigService,
+    private readonly tickets: OAuthTicketService,
   ) {}
 
   // 회원가입
@@ -62,16 +66,26 @@ export class AuthController {
     @Res() res: Response,
   ): Promise<void> {
     try {
-      const { tokens } = await this.auth.findOrCreateGoogleUser(req.user);
-      this.setAuthCookies(res, tokens);
-
-      const successUrl = this.config.getOrThrow<string>('WEB_AUTH_SUCCESS_URL');
-      res.redirect(successUrl);
+      const result = await this.auth.findOrCreateGoogleUser(req.user);
+      const code = this.tickets.issue(result);
+      const base = this.requireUrl('WEB_AUTH_SUCCESS_URL');
+      res.redirect(`${base}?code=${code}`);
     } catch (error) {
       this.logger.error('Google OAuth callback failed', error);
-      const failureUrl = this.config.getOrThrow<string>('WEB_AUTH_FAILURE_URL');
-      res.redirect(failureUrl);
+      res.redirect(this.requireUrl('WEB_AUTH_FAILURE_URL'));
     }
+  }
+
+  // Google OAuth: 코드 교환 (web BFF server-2-server 전용)
+  @Post('oauth/exchange')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  exchange(@Body() dto: OAuthExchangeDto): { user: AuthUser; tokens: AuthTokens } {
+    const result = this.tickets.consume(dto.code);
+    if (!result) {
+      throw new UnauthorizedException('유효하지 않거나 만료된 인증 코드입니다.');
+    }
+    return result;
   }
 
   // 로그인
@@ -157,5 +171,11 @@ export class AuthController {
   private clearAuthCookies(res: Response): void {
     res.clearCookie('access_token', { path: '/' });
     res.clearCookie('refresh_token', { path: '/api/auth/refresh' });
+  }
+
+  private requireUrl(key: string): string {
+    const v = this.config.get<string>(key)?.trim();
+    if (!v) throw new Error(`${key} 환경변수가 비어있습니다.`);
+    return v;
   }
 }
