@@ -1,5 +1,4 @@
 import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
-import { cn } from '@/lib/cn';
 import type { Trend, WeekComparison as WeekComparisonData } from '@/lib/records';
 
 const STYLES = {
