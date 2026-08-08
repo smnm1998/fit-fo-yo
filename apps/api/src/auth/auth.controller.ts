@@ -131,8 +131,8 @@ export class AuthController {
   // 현재 사용자
   @Get('me')
   @UseGuards(JwtAccessGuard)
-  me(@CurrentUser() user: AuthenticatedUser): { user: AuthenticatedUser } {
-    return { user };
+  async me(@CurrentUser() user: AuthenticatedUser): Promise<{ user: AuthUser }> {
+    return { user: await this.auth.getProfile(user.id) };
   }
 
   // 게스트 발급

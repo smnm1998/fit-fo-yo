@@ -188,4 +188,14 @@ export class AuthService {
       data: { refreshTokenHash: hash },
     });
   }
+
+  /** /auth/me 전용 — 가드가 더는 프로필을 싣지 않으므로 여기서 조회 */
+  async getProfile(userId: string): Promise<AuthUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, nickname: true, isGuest: true },
+    });
+    if (!user) throw new UnauthorizedException();
+    return user;
+  }
 }
