@@ -6,7 +6,8 @@ import { Trash2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { RECORD_TYPE_META, MEAL_LABEL, recordName } from '@/lib/record-meta';
 import { useDeleteRecord } from '@/lib/hooks/useDeleteRecord';
-import { Button } from '@/components/ui/Button';
+import { DeleteConfirm } from '@/components/ui/DeleteConfirm';
+
 import type { RecordDto } from '@/lib/types';
 import { POPOVER_SURFACE } from '@/components/ui/surface';
 
@@ -21,9 +22,6 @@ const STYLES = {
   itemRow: 'flex items-center justify-between gap-2 text-xs',
   itemName: 'truncate text-foreground',
   itemMetric: 'shrink-0 tabular-nums text-muted',
-  confirmOverlay:
-    'absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-[inherit] bg-surface/60 backdrop-blur-sm',
-  confirmMsg: 'text-sm font-medium text-foreground',
 } as const;
 
 export function RecordChip({ record }: { record: RecordDto }) {
@@ -87,24 +85,13 @@ export function RecordChip({ record }: { record: RecordDto }) {
           <Popover.Arrow className={STYLES.arrow} />
 
           {confirming && (
-            <div className={STYLES.confirmOverlay}>
-              <span className={STYLES.confirmMsg}>삭제할까요?</span>
-              <div className="flex items-center gap-1.5">
-                <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>
-                  취소
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    void deleteOne(record);
-                    setConfirming(false);
-                  }}
-                >
-                  삭제
-                </Button>
-              </div>
-            </div>
+            <DeleteConfirm
+              onCancel={() => setConfirming(false)}
+              onConfirm={() => {
+                void deleteOne(record);
+                setConfirming(false);
+              }}
+            />
           )}
         </Popover.Content>
       </Popover.Portal>

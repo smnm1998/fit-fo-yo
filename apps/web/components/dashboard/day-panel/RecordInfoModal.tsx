@@ -12,7 +12,7 @@ import { RecordCard } from './record-info/RecordCard';
 const TYPE_ICON = { DIET: Utensils, EXERCISE: Dumbbell } as const;
 
 const STYLES = {
-  tabBar: 'flex w-fit gap-1 rounded-lg bg-subtle p-0.5',
+  tabBar: '-ml-1 flex w-fit gap-1 rounded-lg bg-subtle p-0.5',
   tabBtn: 'rounded-md px-3 py-1 text-xs font-medium text-muted transition-colors',
   tabActive: 'bg-surface text-foreground shadow-sm',
   empty: 'py-8 text-center text-sm text-muted',

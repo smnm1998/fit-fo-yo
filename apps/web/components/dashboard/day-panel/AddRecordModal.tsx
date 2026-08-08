@@ -12,7 +12,7 @@ type Props = {
 export function AddRecordModal({ recordedAt, dateText, onClose }: Props) {
   return (
     <Modal open onClose={onClose} title="기록 추가">
-      <ManualRecordForm recordedAt={recordedAt} dateText={dateText} />
+      <ManualRecordForm recordedAt={recordedAt} dateText={dateText} onSuccess={onClose} />
     </Modal>
   );
 }
