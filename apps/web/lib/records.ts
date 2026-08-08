@@ -44,3 +44,59 @@ export function sumRecordsByDay(records: RecordDto[], dayKeys: string[]): DayPoi
   }
   return dayKeys.map((date) => ({ date, ...sumRecords(groups.get(date) ?? []) }));
 }
+
+/** dayKeys에 속하는 레코드만 추림 */
+export function partitionByKeys(records: RecordDto[], dayKeys: string[]): RecordDto[] {
+  const set = new Set(dayKeys);
+  return records.filter((r) => set.has(dayKeyKST(r.recordedAt)));
+}
+
+export type Trend = { value: number; prev: number; delta: number; pct: number | null };
+
+function trend(value: number, prev: number): Trend {
+  const delta = value - prev;
+  const pct = prev === 0 ? null : Math.round((delta / prev) * 100);
+  return { value, prev, delta, pct };
+}
+
+export type WeekComparison = {
+  calories: Trend;
+  caloriesBurned: Trend;
+  net: Trend;
+  count: Trend;
+};
+
+export function compareWeeks(
+  thisW: DayTotals,
+  lastW: DayTotals,
+  thisCount: number,
+  lastCount: number,
+): WeekComparison {
+  return {
+    calories: trend(thisW.calories, lastW.calories),
+    caloriesBurned: trend(thisW.caloriesBurned, lastW.caloriesBurned),
+    net: trend(thisW.calories - thisW.caloriesBurned, lastW.calories - lastW.caloriesBurned),
+    count: trend(thisCount, lastCount),
+  };
+}
+
+export type Streak = { marks: boolean[]; count: number; longest: number };
+
+/** dayKeys 각 날에 기록이 있었는지 + 총 일수 + 최장 연속 */
+export function weekStreak(records: RecordDto[], dayKeys: string[]): Streak {
+  const recorded = new Set(records.map((r) => dayKeyKST(r.recordedAt)));
+  const marks = dayKeys.map((k) => recorded.has(k));
+  let count = 0;
+  let longest = 0;
+  let run = 0;
+  for (const m of marks) {
+    if (m) {
+      count += 1;
+      run += 1;
+      longest = Math.max(longest, run);
+    } else {
+      run = 0;
+    }
+  }
+  return { marks, count, longest };
+}

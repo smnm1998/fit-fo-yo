@@ -12,11 +12,11 @@ import {
 } from 'recharts';
 import type { DayPoint } from '@/lib/records';
 
-const COLORS = { intake: '#10b981', burned: '#0ea5e9', axis: '#737373', grid: '#f3f3f3' };
+const COLORS = { intake: '#10b981', burned: '#0ea5e9' };
 const AXIS = {
   tickLine: false,
   axisLine: false,
-  tick: { fontSize: 12, fill: COLORS.axis },
+  tick: { fontSize: 12, fill: 'var(--muted)' },
 } as const;
 
 function tickDate(d: string): string {
@@ -28,14 +28,22 @@ export function WeeklyTrendChart({ data }: { data: DayPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-        <CartesianGrid vertical={false} stroke={COLORS.grid} />
+        <CartesianGrid vertical={false} stroke="var(--border)" />
         <XAxis dataKey="date" tickFormatter={(v) => tickDate(String(v))} {...AXIS} />
         <YAxis width={40} {...AXIS} />
         <Tooltip
           labelFormatter={(label) => tickDate(String(label))}
           formatter={(value) => `${value} kcal`}
-          contentStyle={{ borderRadius: 8, border: '1px solid #e5e5e5', fontSize: 12 }}
+          contentStyle={{
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: 12,
+          }}
+          labelStyle={{ color: 'var(--foreground)' }}
         />
+        <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, color: 'var(--foreground)' }} />
+
         <Legend iconType="plainline" wrapperStyle={{ fontSize: 12 }} />
         <Line
           type="monotone"

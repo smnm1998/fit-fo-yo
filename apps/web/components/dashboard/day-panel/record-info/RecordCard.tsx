@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import { Pencil, Trash2, Check, X } from 'lucide-react';
-import { MEAL_OPTIONS } from '@/lib/record-meta';
 import { updateRecord, ApiError } from '@/lib/client/records-api';
 import { useRecordsStore } from '@/lib/store/records-store';
 import { useDeleteRecord } from '@/lib/hooks/useDeleteRecord';
-import { Button } from '@/components/ui/Button';
 import type { RecordDto } from '@/lib/types';
 import {
   buildRemove,
@@ -15,6 +13,16 @@ import {
   toEditItem,
   type EditItem,
 } from './record-info-utils';
+import { DeleteConfirm } from '@/components/ui/DeleteConfirm';
+
+// 끼니 선택 (빈 값 = 기타)
+const MEAL_SELECT = [
+  { value: 'BREAKFAST', label: '아침' },
+  { value: 'LUNCH', label: '점심' },
+  { value: 'DINNER', label: '저녁' },
+  { value: 'SNACK', label: '간식' },
+  { value: '', label: '기타' },
+];
 
 const STYLES = {
   card: 'relative flex items-start justify-between gap-2 rounded-xl border border-border p-3',
@@ -29,15 +37,17 @@ const STYLES = {
   iconBtn:
     'rounded-md p-1 text-muted transition-colors hover:bg-subtle hover:text-foreground disabled:opacity-40',
   iconDanger: 'rounded-md p-1 text-muted transition-colors hover:bg-subtle hover:text-danger',
+
+  // 편집: 채움 필드(밑줄 아님), 구분선 없음
+  editWrap: 'flex w-full flex-col gap-2.5',
+  editRow: 'flex items-center gap-2',
+  editActions: 'ml-auto flex shrink-0 items-center gap-0.5',
   uName:
-    'w-full rounded-none border-0 border-b border-border bg-transparent py-1 text-base font-semibold text-foreground outline-none focus:border-accent',
+    'min-w-0 flex-1 rounded-lg bg-subtle px-2.5 py-1.5 text-sm font-semibold text-foreground outline-none transition focus:ring-2 focus:ring-accent/20',
   uSelect:
-    'shrink-0 rounded-none border-0 border-b border-border bg-transparent py-1 text-xs text-muted outline-none focus:border-accent',
-  uNum: 'w-14 shrink-0 rounded-none border-0 border-b border-border bg-transparent py-1 text-right text-sm text-foreground outline-none focus:border-accent',
+    'shrink-0 rounded-lg bg-subtle px-2.5 py-1.5 text-xs text-muted outline-none transition focus:ring-2 focus:ring-accent/20',
+  uNum: 'w-16 rounded-lg bg-subtle px-2.5 py-1.5 text-right text-sm tabular-nums text-foreground outline-none transition focus:ring-2 focus:ring-accent/20',
   unit: 'text-xs text-muted',
-  confirmOverlay:
-    'absolute inset-0 z-10 flex flex-col items-center justify-center gap-1.5 rounded-xl bg-surface/60 backdrop-blur-sm',
-  confirmMsg: 'text-sm font-medium text-foreground',
   err: 'mt-1 text-[11px] text-danger',
 } as const;
 
@@ -81,14 +91,14 @@ export function RecordCard({ record, index }: { record: RecordDto; index: number
   async function doDelete() {
     if (busy) return;
     if (itemCount(record) <= 1) {
-      void deleteOne(record); // 마지막 아이템 → 레코드 삭제 (낙관적, 카드 언마운트)
+      void deleteOne(record);
       return;
     }
     setBusy(true);
     setError(null);
     try {
       const updated = await updateRecord(record.id, buildRemove(record, index));
-      storeUpdate(updated); // 아이템 하나만 제거
+      storeUpdate(updated);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '삭제에 실패했어요.');
       setMode('view');
@@ -99,67 +109,95 @@ export function RecordCard({ record, index }: { record: RecordDto; index: number
 
   return (
     <div className={STYLES.card}>
-      <div className={STYLES.left}>
-        {mode === 'edit' && draft ? (
-          <>
-            {/* 이름 슬롯 (view의 name 자리) */}
+      {mode === 'edit' && draft ? (
+        <div className={STYLES.editWrap}>
+          {/* 1행: 이름 + (식단이면) 끼니 */}
+          <div className={STYLES.editRow}>
             <input
               className={STYLES.uName}
               value={draft.name}
               onChange={(e) => patch('name', e.target.value)}
               placeholder={isDiet ? '비빔밥' : '러닝'}
             />
-            {/* 메타 슬롯 (view의 칼로리 자리) */}
-            <div className={STYLES.metaRow}>
-              {isDiet ? (
-                <>
-                  <select
-                    className={STYLES.uSelect}
-                    value={draft.mealType}
-                    onChange={(e) => patch('mealType', e.target.value)}
-                  >
-                    {MEAL_OPTIONS.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min={0}
-                    className={STYLES.uNum}
-                    value={draft.calories}
-                    onChange={(e) => patch('calories', e.target.value)}
-                    placeholder="0"
-                  />
-                  <span className={STYLES.unit}>kcal</span>
-                </>
-              ) : (
-                <>
-                  <input
-                    type="number"
-                    min={0}
-                    className={STYLES.uNum}
-                    value={draft.durationMinutes}
-                    onChange={(e) => patch('durationMinutes', e.target.value)}
-                    placeholder="0"
-                  />
-                  <span className={STYLES.unit}>분</span>
-                  <input
-                    type="number"
-                    min={0}
-                    className={STYLES.uNum}
-                    value={draft.caloriesBurned}
-                    onChange={(e) => patch('caloriesBurned', e.target.value)}
-                    placeholder="0"
-                  />
-                  <span className={STYLES.unit}>kcal</span>
-                </>
-              )}
+            {isDiet && (
+              <select
+                className={STYLES.uSelect}
+                value={draft.mealType}
+                onChange={(e) => patch('mealType', e.target.value)}
+              >
+                {MEAL_SELECT.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* 2행: 칼로리(운동은 시간+칼로리) + 확인/취소 */}
+          <div className={STYLES.editRow}>
+            {isDiet ? (
+              <>
+                <input
+                  type="number"
+                  min={0}
+                  className={STYLES.uNum}
+                  value={draft.calories}
+                  onChange={(e) => patch('calories', e.target.value)}
+                  placeholder="0"
+                />
+                <span className={STYLES.unit}>kcal</span>
+              </>
+            ) : (
+              <>
+                <input
+                  type="number"
+                  min={0}
+                  className={STYLES.uNum}
+                  value={draft.durationMinutes}
+                  onChange={(e) => patch('durationMinutes', e.target.value)}
+                  placeholder="0"
+                />
+                <span className={STYLES.unit}>분</span>
+                <input
+                  type="number"
+                  min={0}
+                  className={STYLES.uNum}
+                  value={draft.caloriesBurned}
+                  onChange={(e) => patch('caloriesBurned', e.target.value)}
+                  placeholder="0"
+                />
+                <span className={STYLES.unit}>kcal</span>
+              </>
+            )}
+
+            <div className={STYLES.editActions}>
+              <button
+                type="button"
+                className={STYLES.iconBtn}
+                onClick={() => void save()}
+                disabled={busy}
+                aria-label="확인"
+              >
+                <Check size={15} />
+              </button>
+              <button
+                type="button"
+                className={STYLES.iconBtn}
+                onClick={() => setMode('view')}
+                disabled={busy}
+                aria-label="취소"
+              >
+                <X size={15} />
+              </button>
             </div>
-          </>
-        ) : (
-          <>
+          </div>
+
+          {error && <p className={STYLES.err}>{error}</p>}
+        </div>
+      ) : (
+        <>
+          <div className={STYLES.left}>
             <span className={STYLES.name}>{item.name}</span>
             <div className={STYLES.metaRow}>
               {!isDiet && eItem?.durationMinutes != null && (
@@ -174,63 +212,37 @@ export function RecordCard({ record, index }: { record: RecordDto; index: number
                   )}
               {item.estimated && <span className={STYLES.estBadge}>추정</span>}
             </div>
-          </>
-        )}
-        {error && <p className={STYLES.err}>{error}</p>}
-      </div>
-
-      <div className={STYLES.actions}>
-        {mode === 'view' && (
-          <>
-            <button type="button" className={STYLES.iconBtn} onClick={startEdit} aria-label="수정">
-              <Pencil size={15} />
-            </button>
-            <button
-              type="button"
-              className={STYLES.iconDanger}
-              onClick={() => setMode('confirm')}
-              aria-label="삭제"
-            >
-              <Trash2 size={15} />
-            </button>
-          </>
-        )}
-        {mode === 'edit' && (
-          <>
-            <button
-              type="button"
-              className={STYLES.iconBtn}
-              onClick={() => void save()}
-              disabled={busy}
-              aria-label="저장"
-            >
-              <Check size={15} />
-            </button>
-            <button
-              type="button"
-              className={STYLES.iconBtn}
-              onClick={() => setMode('view')}
-              disabled={busy}
-              aria-label="취소"
-            >
-              <X size={15} />
-            </button>
-          </>
-        )}
-      </div>
-
-      {mode === 'confirm' && (
-        <div className={STYLES.confirmOverlay}>
-          <span className={STYLES.confirmMsg}>삭제할까요?</span>
-          <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="sm" onClick={() => setMode('view')} disabled={busy}>
-              취소
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => void doDelete()} disabled={busy}>
-              삭제
-            </Button>
+            {error && <p className={STYLES.err}>{error}</p>}
           </div>
-        </div>
+
+          {mode === 'view' && (
+            <div className={STYLES.actions}>
+              <button
+                type="button"
+                className={STYLES.iconBtn}
+                onClick={startEdit}
+                aria-label="수정"
+              >
+                <Pencil size={15} />
+              </button>
+              <button
+                type="button"
+                className={STYLES.iconDanger}
+                onClick={() => setMode('confirm')}
+                aria-label="삭제"
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {mode === 'confirm' && (
+        <DeleteConfirm
+          onCancel={() => setMode('view')}
+          onConfirm={() => void doDelete()}
+          busy={busy}
+        />
       )}
     </div>
   );

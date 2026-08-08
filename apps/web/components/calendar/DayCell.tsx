@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { cn } from '@/lib/cn';
 import { dateLabel, dayNoonIsoKST } from '@/lib/date';
@@ -44,8 +45,10 @@ export function DayCell({
   records,
   onSelect,
 }: DayCellProps) {
+  const [addOpen, setAddOpen] = useState(false);
+
   const day = Number(date.slice(8, 10));
-  // 오른쪽 2개 열(금·토)은 왼쪽으로 열어 우측 DayPanel 가림 방지, 나머지는 오른쪽
+  // 오른쪽 2개 열(금·토)은 왼쪽으로 열어 우측 DayPanel 가림 방지
   const popoverSide = weekday >= 5 ? 'left' : 'right';
 
   if (!inMonth) {
@@ -62,7 +65,7 @@ export function DayCell({
   return (
     <div className={cn(STYLES.cell, isToday && STYLES.today)}>
       {/* 빈 칸/숫자 클릭 → 등록 팝오버 */}
-      <Popover.Root>
+      <Popover.Root open={addOpen} onOpenChange={setAddOpen}>
         <Popover.Trigger asChild>
           <button
             type="button"
@@ -79,7 +82,11 @@ export function DayCell({
             collisionPadding={12}
             className={STYLES.content}
           >
-            <ManualRecordForm recordedAt={dayNoonIsoKST(date)} dateText={dateLabel(date)} />
+            <ManualRecordForm
+              recordedAt={dayNoonIsoKST(date)}
+              dateText={dateLabel(date)}
+              onSuccess={() => setAddOpen(false)}
+            />{' '}
             <Popover.Arrow className={STYLES.arrow} />
           </Popover.Content>
         </Popover.Portal>

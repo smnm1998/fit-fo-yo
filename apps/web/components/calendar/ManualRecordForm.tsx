@@ -105,9 +105,11 @@ function TypeSelect({ value, onChange }: { value: RecordType; onChange: (t: Reco
 export function ManualRecordForm({
   recordedAt,
   dateText,
+  onSuccess,
 }: {
   recordedAt: string;
   dateText: string;
+  onSuccess?: () => void;
 }) {
   const addRecord = useRecordsStore((s) => s.addRecord);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -164,6 +166,7 @@ export function ManualRecordForm({
         durationMinutes: '',
         caloriesBurned: '',
       });
+      onSuccess?.();
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : '저장에 실패했어요.');
     }

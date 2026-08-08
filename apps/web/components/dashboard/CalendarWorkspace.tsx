@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
+  currentMonthKST,
   dateLabelDow,
   dayKeyKST,
   dayNoonIsoKST,
@@ -11,6 +12,7 @@ import {
   shiftMonth,
   todayKST,
 } from '@/lib/date';
+
 import { fetchRecords } from '@/lib/client/records-api';
 import { fetchRecommendations } from '@/lib/client/recommendations-api';
 import { useRecordsStore } from '@/lib/store/records-store';
@@ -20,12 +22,12 @@ import { DayPanel } from '@/components/dashboard/day-panel/DayPanel';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 
 const STYLES = {
-  toolbar: 'flex items-center justify-between gap-3',
-  monthNav:
-    'flex items-center gap-0.5 rounded-full border border-border bg-foreground/15 p-0.5 backdrop-blur-sm',
+  toolbar: 'flex items-center gap-2',
   navBtn:
-    'rounded-full p-1 text-muted transition-colors hover:bg-foreground/10 hover:text-foreground',
-  month: 'min-w-[6rem] text-center text-sm font-semibold text-foreground',
+    'grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface text-muted transition-colors hover:border-muted hover:text-foreground',
+  month: 'px-1 text-lg font-bold tabular-nums text-foreground',
+  todayBtn:
+    'ml-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground',
   splitGrid: 'grid gap-6 lg:grid-cols-[1fr_20rem]',
   skeleton: 'h-[22rem] animate-pulse rounded-2xl bg-subtle',
 } as const;
@@ -141,6 +143,14 @@ export function CalendarWorkspace({
     syncUrl(month, next);
   }
 
+  function goToday() {
+    const tMonth = currentMonthKST();
+    const tDate = todayKST();
+    setDate(tDate);
+    if (tMonth !== month) changeMonth(tMonth);
+    syncUrl(tMonth, tDate);
+  }
+
   const dayRecords = useMemo(
     () =>
       monthRecords
@@ -163,25 +173,26 @@ export function CalendarWorkspace({
   return (
     <div className="flex flex-col gap-4">
       <div className={STYLES.toolbar}>
-        <div className={STYLES.monthNav}>
-          <button
-            type="button"
-            className={STYLES.navBtn}
-            onClick={() => changeMonth(shiftMonth(month, -1))}
-            aria-label="이전 달"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <h2 className={STYLES.month}>{monthLabel(month)}</h2>
-          <button
-            type="button"
-            className={STYLES.navBtn}
-            onClick={() => changeMonth(shiftMonth(month, 1))}
-            aria-label="다음 달"
-          >
-            <ChevronRight size={20} />
-          </button>
-        </div>
+        <button
+          type="button"
+          className={STYLES.navBtn}
+          onClick={() => changeMonth(shiftMonth(month, -1))}
+          aria-label="이전 달"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <h2 className={STYLES.month}>{monthLabel(month)}</h2>
+        <button
+          type="button"
+          className={STYLES.navBtn}
+          onClick={() => changeMonth(shiftMonth(month, 1))}
+          aria-label="다음 달"
+        >
+          <ChevronRight size={18} />
+        </button>
+        <button type="button" className={STYLES.todayBtn} onClick={goToday}>
+          오늘
+        </button>
       </div>
 
       <div className={STYLES.splitGrid}>

@@ -11,9 +11,9 @@ const SIZE = {
 } as const;
 
 const STYLES = {
-  overlay: 'fixed inset-0 z-40 bg-black/45 backdrop-blur-sm',
+  overlay: 'fixed inset-0 z-[60] bg-black/45 backdrop-blur-sm',
   content:
-    'fixed inset-0 z-50 flex items-center justify-center p-4 outline-none data-[state=open]:animate-[popIn_140ms_ease-out]',
+    'fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none data-[state=open]:animate-[popIn_140ms_ease-out]',
   panel:
     'flex max-h-[85vh] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl ring-1 ring-black/5',
   head: 'flex items-center justify-between gap-2',

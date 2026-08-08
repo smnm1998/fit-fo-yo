@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
 import { getCurrentUser } from '@/lib/server/user';
-import { currentMonthKST, monthRangeKST, todayKST } from '@/lib/date';
+import { currentMonthKST, monthRangeKST, todayKST, weekDayKeysKST } from '@/lib/date';
+import { weekStreak } from '@/lib/records';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
@@ -38,10 +39,12 @@ export default async function DashboardPage({
     getMonthRecords(month),
     getMonthRecommendations(month),
   ]);
+  const streak = weekStreak(initialRecords, weekDayKeysKST());
 
   return (
     <div className="flex flex-col gap-6">
-      <DashboardHeader nickname={user?.nickname} />
+      <DashboardHeader nickname={user?.nickname} streak={streak} />
+
       <CalendarWorkspace
         initialMonth={month}
         initialDate={date}

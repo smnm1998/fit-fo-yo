@@ -43,8 +43,16 @@ export function MacroChart({
         </Pie>
         <Tooltip
           formatter={(value) => `${value} g`}
-          contentStyle={{ borderRadius: 8, border: '1px solid #e5d5e5', fontSize: 12 }}
+          contentStyle={{
+            borderRadius: 8,
+            border: '1px solid var(--border)',
+            background: 'var(--surface)',
+            fontSize: 12,
+          }}
+          labelStyle={{ color: 'var(--foreground)' }}
         />
+        <Legend iconType="circle" wrapperStyle={{ fontSize: 12, color: 'var(--foreground)' }} />
+
         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
       </PieChart>
     </ResponsiveContainer>
