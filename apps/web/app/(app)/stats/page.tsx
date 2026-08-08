@@ -1,16 +1,17 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
-import { weekDayKeysKST, weekRangeKST } from '@/lib/date';
-import { sumRecords, sumRecordsByDay } from '@/lib/records';
+import { weekRangeKST, weekDayKeysKST, prevWeekDayKeysKST } from '@/lib/date';
+import { sumRecords, sumRecordsByDay, partitionByKeys, compareWeeks } from '@/lib/records';
 import { StatsView } from '@/components/stats/StatsView';
+import { WeekComparison } from '@/components/stats/WeekComparison';
+import { WeeklyInsight } from '@/components/stats/WeeklyInsight';
 import type { RecordDto } from '@/lib/types';
-import { MetricCards } from '@/components/stats/MetricCards';
 
 export const metadata: Metadata = { title: '통계 · FitFoYo' };
 
-async function getWeekRecords(): Promise<RecordDto[]> {
-  const { from, to } = weekRangeKST();
-  const qs = new URLSearchParams({ from, to, limit: '200' });
+async function getRecords(days: number): Promise<RecordDto[]> {
+  const { from, to } = weekRangeKST(days);
+  const qs = new URLSearchParams({ from, to, limit: '400' });
   const res = await apiFetchAuth(`/records?${qs.toString()}`);
   if (!res.ok) return [];
   const data = (await res.json()) as { items: RecordDto[] };
@@ -18,18 +19,31 @@ async function getWeekRecords(): Promise<RecordDto[]> {
 }
 
 export default async function StatsPage() {
-  const records = await getWeekRecords();
-  const daily = sumRecordsByDay(records, weekDayKeysKST());
-  const totals = sumRecords(records);
+  const records = await getRecords(14);
+  const thisKeys = weekDayKeysKST();
+  const lastKeys = prevWeekDayKeysKST();
+
+  const thisRecs = partitionByKeys(records, thisKeys);
+  const lastRecs = partitionByKeys(records, lastKeys);
+
+  const thisTotals = sumRecords(thisRecs);
+  const lastTotals = sumRecords(lastRecs);
+  const comparison = compareWeeks(thisTotals, lastTotals, thisRecs.length, lastRecs.length);
+  const daily = sumRecordsByDay(thisRecs, thisKeys);
+
   return (
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-foreground">이번 주 합계</h2>
-        <MetricCards totals={totals} count={records.length} />
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">이번 주 요약</h2>
+          <p className="text-xs text-muted">지난주 대비 변화</p>
+        </div>
+        <WeekComparison data={comparison} />
       </section>
+      <WeeklyInsight data={comparison} count={thisRecs.length} />
       <StatsView
         daily={daily}
-        macros={{ carbs: totals.carbs, protein: totals.protein, fat: totals.fat }}
+        macros={{ carbs: thisTotals.carbs, protein: thisTotals.protein, fat: thisTotals.fat }}
       />
     </div>
   );
