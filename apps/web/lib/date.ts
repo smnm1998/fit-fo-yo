@@ -40,9 +40,16 @@ export function todayKST(): string {
   return formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd');
 }
 
-/** UTC ISO -> 그 인스턴스가 KST로 며칠인지 'YYYY-MM-DD' */
+/** UTC ISO -> 그 인스턴스가 KST로 며칠인지 'YYYY-MM-DD' (잘못된 값은 '' 반환 → 달력에서 조용히 제외) */
 export function dayKeyKST(iso: string): string {
-  return formatInTimeZone(new Date(iso), TZ, 'yyyy-MM-dd');
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[dayKeyKST] 잘못된 날짜 입력:', JSON.stringify(iso));
+    }
+    return '';
+  }
+  return formatInTimeZone(d, TZ, 'yyyy-MM-dd');
 }
 
 /** 'YYYY-MM' -> 6주 달력 그리드용 'YYYY-MM-DD' 배열 */
@@ -102,4 +109,12 @@ export function todayLabelLong(): string {
 /** dayKey('YYYY-MM-DD') → 그 날 정오(KST) ISO. recordedAt 기본값용(정오라 UTC 변환에도 날짜 안 밀림) */
 export function dayNoonIsoKST(dayKey: string): string {
   return new Date(`${dayKey}T12:00:00+09:00`).toISOString();
+}
+
+/** 지난 주(8~14일 전 구간) 'YYYY-MM-DD' 배열 — 전주 비교용 (이번 주와 겹치지 않음) */
+export function prevWeekDayKeysKST(days = 7): string[] {
+  const end = startOfDay(toZonedTime(new Date(), TZ));
+  return Array.from({ length: days }, (_, i) =>
+    format(subDays(end, days - 1 - i + days), 'yyyy-MM-dd'),
+  );
 }

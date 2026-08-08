@@ -32,9 +32,9 @@ export class AiService {
 
   /**
    * 순수 파싱 — LLM 호출 + tool_call 분류만. 저장 없음.
-   * 테스트 시 OpenAIClient mocking 으로 격리 검증.
+   * 병렬 tool call 지원: 식단+운동이 함께 오면 결과가 2개.
    */
-  async parse(rawInput: string): Promise<ParsedResult> {
+  async parse(rawInput: string): Promise<ParsedResult[]> {
     const response = await this.openai.chatWithTools({
       system: PARSE_RECORD_SYSTEM_PROMPT,
       user: rawInput,
@@ -42,91 +42,107 @@ export class AiService {
       toolChoice: 'required',
     });
 
-    const toolCall = response.choices[0]?.message.tool_calls?.[0];
-    if (!toolCall || toolCall.type !== 'function') {
+    const results: ParsedResult[] = [];
+    for (const toolCall of response.choices[0]?.message.tool_calls ?? []) {
+      if (toolCall.type !== 'function') continue;
+      const args = this.safeParseJson(toolCall.function.arguments);
+      switch (toolCall.function.name) {
+        case 'record_diet':
+          results.push({ kind: 'diet', payload: args as ParsedDietPayload });
+          break;
+        case 'record_exercise':
+          results.push({ kind: 'exercise', payload: args as ParsedExercisePayload });
+          break;
+        case 'record_invalid_domain':
+          results.push({
+            kind: 'invalid_domain',
+            reason: (args as { reason?: string }).reason ?? '도메인 밖 입력',
+          });
+          break;
+        default:
+          throw new InternalServerErrorException(`Unknown tool: ${toolCall.function.name}`);
+      }
+    }
+
+    if (results.length === 0) {
       this.logger.error(
         `OpenAI returned no tool_call. raw response: ${JSON.stringify(response.choices[0])}`,
       );
       throw new InternalServerErrorException('AI 파싱 결과를 받지 못했습니다.');
     }
-
-    const args = this.safeParseJson(toolCall.function.arguments);
-
-    switch (toolCall.function.name) {
-      case 'record_diet':
-        return { kind: 'diet', payload: args as ParsedDietPayload };
-      case 'record_exercise':
-        return { kind: 'exercise', payload: args as ParsedExercisePayload };
-      case 'record_invalid_domain':
-        return {
-          kind: 'invalid_domain',
-          reason: (args as { reason?: string }).reason ?? '도메인 밖 입력',
-        };
-      default:
-        throw new InternalServerErrorException(`Unknown tool: ${toolCall.function.name}`);
-    }
+    return results;
   }
 
   /**
    * 파싱 + Records 저장. 컨트롤러에서 호출하는 메인 진입점.
+   * 식단+운동이 함께면 각각 저장 -> 생성된 레코드 배열 반환
    */
   async parseAndSave(params: { userId: string; rawInput: string; fallbackRecordedAt?: string }) {
-    const parsed = await this.parse(params.rawInput);
+    const results = await this.parse(params.rawInput);
+    const valid = results.filter(
+      (r): r is Extract<ParsedResult, { kind: 'diet' | 'exercise' }> => r.kind !== 'invalid_domain',
+    );
 
-    if (parsed.kind === 'invalid_domain') {
+    if (valid.length === 0) {
+      const invalid = results.find(
+        (r): r is Extract<ParsedResult, { kind: 'invalid_domain' }> => r.kind === 'invalid_domain',
+      );
       throw new BadRequestException({
         code: 'INVALID_DOMAIN',
         message: '식단 또는 운동과 관련된 내용을 입력해주세요.',
-        reason: parsed.reason,
+        reason: invalid?.reason,
       });
     }
 
-    const recordedAt = this.resolveRecordedAt(
-      parsed.kind === 'diet' ? parsed.payload.recordedAt : parsed.payload.recordedAt,
-      params.fallbackRecordedAt,
-    );
+    return Promise.all(
+      valid.map(async (parsed) => {
+        const recordedAt = this.resolveRecordedAt(
+          parsed.payload.recordedAt,
+          params.fallbackRecordedAt,
+        );
 
-    if (parsed.kind === 'diet') {
-      const items = parsed.payload.items;
-      const table = await this.nutrition.lookupMany(items.map((i) => i.name));
+        if (parsed.kind === 'diet') {
+          const items = parsed.payload.items;
+          const table = await this.nutrition.lookupMany(items.map((i) => i.name));
+          return this.records.createFromParsed({
+            userId: params.userId,
+            type: RecordType.DIET,
+            rawInput: params.rawInput,
+            parsedJson: parsed.payload as unknown as Prisma.InputJsonValue,
+            recordedAt,
+            dietItems: items.map((item) => {
+              const grounded = this.groundCalories(item, table);
+              return {
+                name: item.name,
+                mealType: item.mealType || undefined,
+                quantity: item.quantity,
+                unit: item.unit,
+                calories: grounded.calories,
+                carbs: item.carbs,
+                protein: item.protein,
+                fat: item.fat,
+                estimated: grounded.estimated,
+              };
+            }),
+          });
+        }
 
-      return this.records.createFromParsed({
-        userId: params.userId,
-        type: RecordType.DIET,
-        rawInput: params.rawInput,
-        parsedJson: parsed.payload as unknown as Prisma.InputJsonValue,
-        recordedAt,
-        dietItems: items.map((item) => {
-          const grounded = this.groundCalories(item, table);
-          return {
+        return this.records.createFromParsed({
+          userId: params.userId,
+          type: RecordType.EXERCISE,
+          rawInput: params.rawInput,
+          parsedJson: parsed.payload as unknown as Prisma.InputJsonValue,
+          recordedAt,
+          exerciseItems: parsed.payload.items.map((item) => ({
             name: item.name,
-            mealType: item.mealType || undefined,
-            quantity: item.quantity,
-            unit: item.unit,
-            calories: grounded.calories,
-            carbs: item.carbs,
-            protein: item.protein,
-            fat: item.fat,
-            estimated: grounded.estimated,
-          };
-        }),
-      });
-    }
-
-    return this.records.createFromParsed({
-      userId: params.userId,
-      type: RecordType.EXERCISE,
-      rawInput: params.rawInput,
-      parsedJson: parsed.payload as unknown as Prisma.InputJsonValue,
-      recordedAt,
-      exerciseItems: parsed.payload.items.map((item) => ({
-        name: item.name,
-        durationMinutes: item.durationMinutes,
-        intensity: item.intensity,
-        caloriesBurned: this.resolveCaloriesBurned(item),
-        estimated: item.estimated,
-      })),
-    });
+            durationMinutes: item.durationMinutes,
+            intensity: item.intensity,
+            caloriesBurned: this.resolveCaloriesBurned(item),
+            estimated: item.estimated,
+          })),
+        });
+      }),
+    );
   }
 
   private safeParseJson(raw: string): unknown {

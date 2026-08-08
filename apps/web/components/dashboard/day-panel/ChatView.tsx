@@ -76,9 +76,12 @@ export function ChatView({ dateLabelText, recordedAt, onBack }: Props) {
     if (taRef.current) taRef.current.style.height = 'auto';
     setSending(true);
     try {
-      const record = await parseAndSave(text, recordedAt);
-      addRecord(record);
-      patch(recordedAt, id, { status: 'done', summary: recordSummary(record) });
+      const records = await parseAndSave(text, recordedAt);
+      records.forEach((r) => addRecord(r));
+      patch(recordedAt, id, {
+        status: 'done',
+        summary: records.map(recordSummary).join(' '),
+      });
     } catch (err) {
       const error = err instanceof ApiError ? err.message : '기록에 실패했어요.';
       patch(recordedAt, id, { status: 'error', error });

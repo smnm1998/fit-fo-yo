@@ -52,10 +52,10 @@ describe('AiService', () => {
       );
 
       const result = await service.parse('닭가슴살 한 그릇');
-
-      expect(result.kind).toBe('diet');
-      if (result.kind === 'diet') {
-        expect(result.payload.items[0].name).toBe('닭가슴살');
+      const [first] = result;
+      expect(first?.kind).toBe('diet');
+      if (first?.kind === 'diet') {
+        expect(first.payload.items[0]?.name).toBe('닭가슴살');
       }
     });
 
@@ -67,8 +67,7 @@ describe('AiService', () => {
       );
 
       const result = await service.parse('30분 러닝');
-
-      expect(result.kind).toBe('exercise');
+      expect(result[0]?.kind).toBe('exercise');
     });
 
     it('record_invalid_domain 은 invalid_domain + reason 으로 분류한다', async () => {
@@ -76,11 +75,10 @@ describe('AiService', () => {
         toolCallResponse('record_invalid_domain', { reason: '일상 잡담' }),
       );
 
-      const result = await service.parse('내일 날씨 어때?');
-
-      expect(result.kind).toBe('invalid_domain');
-      if (result.kind === 'invalid_domain') {
-        expect(result.reason).toBe('일상 잡담');
+      const [first] = await service.parse('내일 날씨 어때?');
+      expect(first?.kind).toBe('invalid_domain');
+      if (first?.kind === 'invalid_domain') {
+        expect(first.reason).toBe('일상 잡담');
       }
     });
 

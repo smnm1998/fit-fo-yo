@@ -33,9 +33,9 @@ export type UpdateRecordInput = {
   exerciseItems?: CreateRecordInput['exerciseItems'];
 };
 
-export function parseAndSave(rawInput: string, recordedAt?: string): Promise<RecordDto> {
-  return request<RecordDto>('/api/ai/parse-and-save', {
-    method: 'POST',
+export function parseAndSave(rawInput: string, recordedAt?: string): Promise<RecordDto[]> {
+  return request<RecordDto[]>('/api/ai/parse-and-save', {
+    method: 'post',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rawInput, ...(recordedAt ? { recordedAt } : {}) }),
   });
