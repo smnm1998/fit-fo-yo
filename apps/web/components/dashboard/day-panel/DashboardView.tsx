@@ -32,9 +32,9 @@ const STYLES = {
   feedHead: 'flex items-center gap-1.5 text-[11px] font-semibold text-muted',
   feedText: 'text-sm leading-relaxed text-foreground',
   feedEmpty: 'text-sm leading-relaxed text-muted',
-  totals:
-    'grid grid-cols-3 divide-x divide-border overflow-hidden rounded-2xl border border-border bg-surface',
-  totalCard: 'flex flex-col gap-1 px-3 py-3.5',
+  totals: 'grid grid-cols-3 divide-x divide-border border-y border-border',
+  totalCard: 'flex flex-col gap-1 px-3 py-3',
+
   totalLabel: 'text-[11px] text-muted',
   totalValue: 'text-sm font-bold tabular-nums',
   totalUnit: 'text-[11px] font-medium text-muted',

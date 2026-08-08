@@ -2,7 +2,18 @@
 
 import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
-import { BarChart3, CalendarDays, LogOut, PanelLeft, User, X } from 'lucide-react';
+import {
+  BarChart3,
+  CalendarDays,
+  FileText,
+  Lock,
+  LogOut,
+  PanelLeft,
+  Target,
+  User,
+  Users,
+  X,
+} from 'lucide-react';
 import { ProfileDialog } from '@/components/layout/ProfileDialog';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -18,6 +29,12 @@ const NAV = [
   { href: '/stats', label: '통계', Icon: BarChart3 },
 ] as const;
 
+const SOON = [
+  { label: '목표 관리', Icon: Target },
+  { label: '리포트', Icon: FileText },
+  { label: '커뮤니티', Icon: Users },
+] as const;
+
 const STYLES = {
   backdrop: 'fixed inset-0 z-40 bg-black/20 md:hidden',
   aside:
@@ -26,6 +43,11 @@ const STYLES = {
   brandName: 'truncate text-base font-bold text-foreground',
   nav: 'flex flex-1 flex-col gap-1 px-2 py-2',
   link: 'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
+  linkSoon:
+    'group relative flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted/50',
+  soonLabel: 'px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted/60',
+  soonTip:
+    'pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover/soon:opacity-100',
   linkActive: 'bg-subtle text-foreground',
   bottom: 'flex flex-col gap-1 border-t border-border p-2',
   account:
@@ -151,6 +173,15 @@ export function Sidebar() {
               </Link>
             );
           })}
+          <p className={cn(STYLES.soonLabel, collapsed && 'md:hidden')}>곧 추가돼요</p>
+          {SOON.map(({ label, Icon }) => (
+            <div key={label} className={STYLES.linkSoon} aria-disabled="true">
+              <Icon size={18} className="shrink-0" />
+              <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
+              <Lock size={13} className={cn('ml-auto shrink-0', collapsed && 'md:hidden')} />
+              {collapsed && <span className={STYLES.tooltip}>{label}</span>}
+            </div>
+          ))}
         </nav>
 
         {/* 하단: 계정 위젯 + 다크 토글 */}
