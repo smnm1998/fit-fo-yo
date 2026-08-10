@@ -15,7 +15,7 @@ const STYLES = {
   content:
     'fixed inset-0 z-[70] flex items-center justify-center p-4 outline-none data-[state=open]:animate-[popIn_140ms_ease-out]',
   panel:
-    'flex max-h-[85vh] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl ring-1 ring-black/5',
+    'flex max-h-[85vh] flex-col gap-2 overflow-y-auto rounded-2xl border border-border bg-surface p-5 shadow-2xl ring-1 ring-black/5',
   head: 'flex items-center justify-between gap-2',
   titleWrap: 'flex min-w-0 items-center gap-2',
   title: 'truncate text-base font-bold text-foreground',

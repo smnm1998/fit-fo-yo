@@ -49,6 +49,7 @@ const STYLES = {
   uNum: 'w-16 rounded-lg bg-subtle px-2.5 py-1.5 text-right text-sm tabular-nums text-foreground outline-none transition focus:ring-2 focus:ring-accent/20',
   unit: 'text-xs text-muted',
   err: 'mt-1 text-[11px] text-danger',
+  desc: 'text-xs leading-relaxed text-muted',
 } as const;
 
 export function RecordCard({ record, index }: { record: RecordDto; index: number }) {
@@ -202,6 +203,9 @@ export function RecordCard({ record, index }: { record: RecordDto; index: number
             <div className={STYLES.metaRow}>
               {!isDiet && eItem?.durationMinutes != null && (
                 <span className={STYLES.sub}>{eItem.durationMinutes}분</span>
+              )}
+              {isDiet && typeof dItem?.grams === 'number' && (
+                <span className={STYLES.sub}>약 {dItem.grams}g</span>
               )}
               {isDiet
                 ? typeof dItem?.calories === 'number' && (

@@ -24,11 +24,12 @@ const STYLES = {
   itemMetric: 'shrink-0 tabular-nums text-muted',
 } as const;
 
-export function RecordChip({ record }: { record: RecordDto }) {
+export function RecordChip({ record, weekday }: { record: RecordDto; weekday: number }) {
   const [confirming, setConfirming] = useState(false);
   const deleteOne = useDeleteRecord();
   const meta = RECORD_TYPE_META[record.type];
   const isDiet = record.type === 'DIET';
+  const side = weekday >= 5 ? 'left' : 'right';
 
   return (
     <Popover.Root onOpenChange={(open) => !open && setConfirming(false)}>
@@ -39,7 +40,7 @@ export function RecordChip({ record }: { record: RecordDto }) {
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content
-          side="right"
+          side={side}
           align="start"
           sideOffset={8}
           collisionPadding={12}
@@ -66,7 +67,10 @@ export function RecordChip({ record }: { record: RecordDto }) {
                     {it.mealType ? ` · ${MEAL_LABEL[it.mealType] ?? it.mealType}` : ''}
                   </span>
                   {typeof it.calories === 'number' && (
-                    <span className={STYLES.itemMetric}>{it.calories} kcal</span>
+                    <span className={STYLES.itemMetric}>
+                      {typeof it.grams === 'number' ? `${it.grams}g · ` : ''}
+                      {it.calories} kcal
+                    </span>
                   )}
                 </div>
               ))
