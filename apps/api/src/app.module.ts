@@ -24,10 +24,7 @@ import { RecommendationModule } from './recommendation/recommendation.module';
     ScheduleModule.forRoot(),
 
     // 2. Rate Limiting (글로벌 + AI 전용)
-    ThrottlerModule.forRoot([
-      { name: 'default', ttl: 60_000, limit: 100 },
-      { name: 'ai', ttl: 60_000, limit: 10 },
-    ]),
+    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
 
     // 3. 모듈
     AuthModule,
