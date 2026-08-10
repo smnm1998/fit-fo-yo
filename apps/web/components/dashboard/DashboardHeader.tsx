@@ -1,6 +1,7 @@
 import { todayLabelLong } from '@/lib/date';
 import type { Streak } from '@/lib/records';
 import { StreakDots } from './StreakDots';
+import Image from 'next/image';
 
 const STYLES = {
   wrap: 'flex flex-wrap items-center justify-between gap-4',
@@ -21,8 +22,17 @@ export function DashboardHeader({
     <header className={STYLES.wrap}>
       <div className={STYLES.greet}>
         <h1 className={STYLES.title}>
-          {name ? `${name}님, 반갑습니다` : '반갑습니다'} <span aria-hidden>👋</span>
+          {name ? `${name}님, 반갑습니다` : '반갑습니다'}{' '}
+          <Image
+            src="/Hello.png"
+            alt=""
+            width={28}
+            height={28}
+            aria-hidden
+            className="inline-block align-[-5px] origin-[70%_70%] animate-[wave_2.4s_ease-in-out_infinite]"
+          />
         </h1>
+
         <p className={STYLES.date}>{todayLabelLong()}</p>
       </div>
       <StreakDots streak={streak} />

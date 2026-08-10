@@ -1,5 +1,6 @@
 import { cn } from '@/lib/cn';
 import type { Streak } from '@/lib/records';
+import Image from 'next/image';
 
 const STYLES = {
   wrap: 'group relative inline-flex items-center gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/20',
@@ -19,8 +20,18 @@ export function StreakDots({ streak }: { streak: Streak }) {
         ))}
       </span>
       <span className={STYLES.count}>
-        {streak.count}일{streak.count > 0 && ' 🔥'}
+        {streak.count}일
+        {streak.count > 0 && (
+          <Image
+            src="/Fire.png"
+            alt=""
+            width={20}
+            height={20}
+            className="ml-1 inline-block align-[-3px] animate-[flicker_1.8s_ease-in-out_infinite]"
+          />
+        )}
       </span>
+
       <span className={STYLES.tip}>이번 주 기록 기준</span>
     </div>
   );

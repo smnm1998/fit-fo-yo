@@ -6,6 +6,7 @@ import { Sparkles, Flame, CalendarDays, Target, Check, type LucideIcon } from 'l
 import { getCurrentUser } from '@/lib/server/user';
 import { HeroDecor } from '@/components/marketing/HeroDecor';
 import { TypingTags } from '@/components/marketing/TypingTags';
+import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Reveal } from '@/components/marketing/Reveal';
 import { GuestDemoButton } from '@/components/marketing/GuestDemoButton';
 
@@ -148,6 +149,7 @@ export default async function Home() {
 
           {/* 우: 인증 (범위↑) */}
           <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
             <Link
               href="/login"
               className="rounded-lg px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground"
