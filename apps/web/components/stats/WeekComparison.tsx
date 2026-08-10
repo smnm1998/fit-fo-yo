@@ -7,7 +7,7 @@ const STYLES = {
   label: 'text-xs text-muted',
   value: 'mt-1 text-xl font-semibold tabular-nums text-foreground',
   unit: 'ml-1 text-sm font-normal text-muted',
-  delta: 'mt-1.5 flex items-center gap-1 text-xs tabular-nums text-muted',
+  delta: 'mt-1.5 flex items-center gap-1 text-xs tabular-nums',
   none: 'mt-1.5 text-xs text-muted',
 } as const;
 
@@ -15,8 +15,9 @@ function Delta({ t }: { t: Trend }) {
   if (t.prev === 0) return <p className={STYLES.none}>지난주 기록 없음</p>;
   const up = t.delta > 0;
   const Icon = t.delta === 0 ? Minus : up ? ArrowUp : ArrowDown;
+  const tone = t.delta === 0 ? 'text-muted' : up ? 'text-red-500' : 'text-blue-500';
   return (
-    <p className={STYLES.delta}>
+    <p className={`${STYLES.delta} ${tone}`}>
       <Icon size={13} />
       <span>
         {up ? '+' : ''}
