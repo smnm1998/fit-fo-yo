@@ -38,7 +38,7 @@ export class RecommendationController {
   /** 현재 유저의 오늘 추천 즉시 생성(어제 기록 기반), 게스트 포함, runForAllUsers 우회 */
   @Post('generate')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ ai: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   generate(@CurrentUser() user: AuthenticatedUser) {
     return this.recommendation.generateForUser(user.id, this.todayDateOnly());
   }

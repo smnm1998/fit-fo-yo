@@ -118,3 +118,17 @@ export function prevWeekDayKeysKST(days = 7): string[] {
     format(subDays(end, days - 1 - i + days), 'yyyy-MM-dd'),
   );
 }
+
+/** weeksAgo 주 전 기준, 지난 days일의 'YYYY-MM-DD' (오래된→최신). week=0 이번주, 1 지난주 */
+export function weekDayKeysAgoKST(weeksAgo = 0, days = 7): string[] {
+  const end = subDays(startOfDay(toZonedTime(new Date(), TZ)), weeksAgo * 7);
+  return Array.from({ length: days }, (_, i) => format(subDays(end, days - 1 - i), 'yyyy-MM-dd'));
+}
+
+/** weeksAgo 주 전 기준, 지난 days일의 UTC 범위 */
+export function weekRangeAgoKST(weeksAgo = 0, days = 7): { from: string; to: string } {
+  const anchor = subDays(toZonedTime(new Date(), TZ), weeksAgo * 7);
+  const from = fromZonedTime(startOfDay(subDays(anchor, days - 1)), TZ).toISOString();
+  const to = fromZonedTime(endOfDay(anchor), TZ).toISOString();
+  return { from, to };
+}

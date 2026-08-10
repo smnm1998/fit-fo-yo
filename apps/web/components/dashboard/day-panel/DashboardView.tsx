@@ -104,24 +104,26 @@ export function DashboardView({
         };
       });
     }
-    const groups: Record<string, RecordDto[]> = {};
+    const groups: Record<string, { record: RecordDto; item: RecordDto['dietItems'][number] }[]> =
+      {};
     for (const r of filtered) {
-      const meal = r.dietItems[0]?.mealType ?? 'ETC';
-      (groups[meal] ??= []).push(r);
+      for (const it of r.dietItems) {
+        const meal = it.mealType ?? 'ETC';
+        (groups[meal] ??= []).push({ record: r, item: it });
+      }
     }
     return MEAL_ORDER.filter((m) => groups[m]?.length).map((meal) => {
-      const recs = groups[meal] ?? [];
-      const items = recs.flatMap((r) => r.dietItems);
-      const kcal = items.reduce((s, it) => s + (it.calories ?? 0), 0);
+      const cell = groups[meal] ?? [];
+      const kcal = cell.reduce((s, e) => s + (e.item.calories ?? 0), 0);
       const label = (MEAL_LABEL as Record<string, string>)[meal] ?? '기타';
-      const first = items[0]?.name ?? '';
+      const first = cell[0]?.item.name ?? '';
       return {
         key: `meal:${meal}`,
         title: label,
         label,
-        summary: items.length > 1 ? `${first} 외 ${items.length - 1}개` : first,
+        summary: cell.length > 1 ? `${first} 외 ${cell.length - 1}개` : first,
         kcal,
-        records: recs,
+        records: Array.from(new Set(cell.map((e) => e.record))),
       };
     });
   }, [dayRecords, filter]);
@@ -140,7 +142,7 @@ export function DashboardView({
       records: [rec],
       tabs: false,
       defaultMeal: undefined,
-      title: rec.exerciseItems[0]?.name ?? '운동',
+      title: '운동',
     };
   }, [infoKey, dietRecords, dayRecords]);
 

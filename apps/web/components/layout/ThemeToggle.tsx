@@ -1,10 +1,12 @@
+'use client';
+
 import { useEffect, useState } from 'react';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
-const STYLE = 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground';
+const BASE = 'p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground';
 
-export function ThemeToggle() {
+export function ThemeToggle({ className = 'rounded-lg' }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -15,7 +17,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className={STYLE}
+      className={`${BASE} ${className}`}
       aria-label={isDark ? '라이트 모드 전환' : '다크 모드 전환'}
     >
       {mounted && isDark ? <Sun size={18} /> : <Moon size={18} />}

@@ -117,6 +117,7 @@ export class AiService {
                 mealType: item.mealType || undefined,
                 quantity: item.quantity,
                 unit: item.unit,
+                grams: grounded.grams,
                 calories: grounded.calories,
                 carbs: item.carbs,
                 protein: item.protein,
@@ -167,13 +168,21 @@ export class AiService {
       estimated: boolean;
     },
     table: Map<string, FoodNutrition>,
-  ): { calories?: number; estimated: boolean } {
+  ): { calories?: number; grams?: number; estimated: boolean } {
     const hit = table.get(normalizeFoodName(item.name));
     if (hit) {
       const grams = this.resolveGrams(item, hit.gramsPerServing);
-      return { calories: Math.round((hit.caloriesPer100g * grams) / 100), estimated: false };
+      return {
+        calories: Math.round((hit.caloriesPer100g * grams) / 100),
+        grams: Math.round(grams),
+        estimated: false,
+      };
     }
-    return { calories: this.resolveCalories(item), estimated: item.estimated };
+    const grams =
+      typeof item.gramsEstimate === 'number' && item.gramsEstimate > 0
+        ? Math.round(item.gramsEstimate)
+        : undefined;
+    return { calories: this.resolveCalories(item), grams, estimated: item.estimated };
   }
 
   /** g/ml 로 무게를 직접 준 경우만 LLM grams 신뢰, 아니면 DB 대표 그램수 × 수량 */

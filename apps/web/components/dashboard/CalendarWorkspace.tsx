@@ -8,18 +8,15 @@ import {
   dayKeyKST,
   dayNoonIsoKST,
   monthLabel,
-  monthRangeKST,
   shiftMonth,
   todayKST,
 } from '@/lib/date';
-
-import { fetchRecords } from '@/lib/client/records-api';
-import { fetchRecommendations } from '@/lib/client/recommendations-api';
 import { useRecordsStore } from '@/lib/store/records-store';
 import { sumRecords } from '@/lib/records';
 import { CalendarGrid } from '@/components/calendar/CalendarGrid';
 import { DayPanel } from '@/components/dashboard/day-panel/DayPanel';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
+import { fetchMonthData } from '@/lib/client/month-api';
 
 const STYLES = {
   toolbar: 'flex items-center gap-2',
@@ -71,12 +68,8 @@ export function CalendarWorkspace({
     const existing = inflight.current.get(m);
     if (existing) return existing; // 진행 중인 같은 달 fetch 재사용 (프리페치+이동 중복 방지)
     const p = (async () => {
-      const { from, to } = monthRangeKST(m);
-      const [recs, recoms] = await Promise.all([
-        fetchRecords(from, to),
-        fetchRecommendations(from, to),
-      ]);
-      const entry: MonthEntry = { records: recs, recs: recoms };
+      const { records, recommendations } = await fetchMonthData(m);
+      const entry: MonthEntry = { records, recs: recommendations };
       cache.current.set(m, entry);
       return entry;
     })().finally(() => inflight.current.delete(m));

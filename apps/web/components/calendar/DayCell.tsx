@@ -105,7 +105,7 @@ export function DayCell({
         </span>
         <div className={STYLES.lines}>
           {shown.map((r) => (
-            <RecordChip key={r.id} record={r} />
+            <RecordChip key={r.id} record={r} weekday={weekday} />
           ))}
           {extra > 0 && <span className={STYLES.more}>+{extra}</span>}
         </div>

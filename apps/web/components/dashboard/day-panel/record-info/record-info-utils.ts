@@ -55,6 +55,7 @@ function dietToInput(it: DietItem): DietInput {
     mealType: it.mealType ?? undefined,
     quantity: it.quantity ?? undefined,
     unit: it.unit ?? undefined,
+    grams: it.grams ?? undefined,
     calories: it.calories ?? undefined,
     carbs: it.carbs ?? undefined,
     protein: it.protein ?? undefined,
@@ -62,6 +63,7 @@ function dietToInput(it: DietItem): DietInput {
     estimated: it.estimated,
   };
 }
+
 function exerciseToInput(it: ExerciseItem): ExerciseInput {
   return {
     name: it.name,
@@ -83,6 +85,8 @@ export function buildReplace(record: RecordDto, index: number, edit: EditItem): 
               name: edit.name.trim(),
               mealType: edit.mealType || undefined,
               calories: toNum(edit.calories),
+              // 칼로리를 손대면 추정 해제
+              estimated: toNum(edit.calories) === (it.calories ?? undefined) ? it.estimated : false,
             }
           : dietToInput(it),
       ),
@@ -96,6 +100,10 @@ export function buildReplace(record: RecordDto, index: number, edit: EditItem): 
             name: edit.name.trim(),
             durationMinutes: toNum(edit.durationMinutes),
             caloriesBurned: toNum(edit.caloriesBurned),
+            estimated:
+              toNum(edit.caloriesBurned) === (it.caloriesBurned ?? undefined)
+                ? it.estimated
+                : false,
           }
         : exerciseToInput(it),
     ),

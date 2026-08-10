@@ -100,3 +100,22 @@ export function weekStreak(records: RecordDto[], dayKeys: string[]): Streak {
   }
   return { marks, count, longest };
 }
+
+export type MealSlice = { meal: string; calories: number };
+
+const MEAL_SEQUENCE = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'ETC'] as const;
+
+/** 식단 레코드를 끼니별 칼로리 합으로 (칼로리 있는 끼니만, 정해진 순서) */
+export function mealDistribution(records: RecordDto[]): MealSlice[] {
+  const sums = new Map<string, number>();
+  for (const r of records) {
+    if (r.type !== 'DIET') continue;
+    for (const d of r.dietItems) {
+      const meal = d.mealType ?? 'ETC';
+      sums.set(meal, (sums.get(meal) ?? 0) + (d.calories ?? 0));
+    }
+  }
+  return MEAL_SEQUENCE.map((meal) => ({ meal, calories: sums.get(meal) ?? 0 })).filter(
+    (s) => s.calories > 0,
+  );
+}

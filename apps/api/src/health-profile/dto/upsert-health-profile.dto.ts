@@ -11,7 +11,7 @@ export class UpsertHealthProfileDto {
   @IsNumber()
   @Min(0)
   @Max(300)
-  weightKey?: number;
+  weightKg?: number;
 
   @IsOptional()
   @IsString()

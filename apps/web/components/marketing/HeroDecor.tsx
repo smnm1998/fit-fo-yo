@@ -5,13 +5,13 @@ import Image from 'next/image';
 
 // public 폴더의 3D dynamic-color 아이콘
 const ICONS = [
-  '/gym-dynamic-color.svg',
-  '/takeaway-cup-dynamic-color.svg',
-  '/fire-dynamic-color.svg',
-  '/calender-dynamic-color.svg',
-  '/chat-bubble-dynamic-color.svg',
-  '/flash-dynamic-color.svg',
-  '/clock-dynamic-color.svg',
+  '/Fire.png',
+  '/Green Salad.png',
+  '/Red Apple.png',
+  '/Glass Of Milk.png',
+  '/Pill.png',
+  '/Direct Hit.png',
+  '/Hundred Points.png',
 ];
 
 const SIZE = 22; // 아이콘 표시 크기(px)
@@ -186,7 +186,6 @@ export function HeroDecor() {
             alt=""
             width={SIZE}
             height={SIZE}
-            unoptimized
             className="h-full w-full drop-shadow-md"
           />
         </span>

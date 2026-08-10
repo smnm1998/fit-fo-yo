@@ -16,7 +16,7 @@ export class AiController {
    */
   @Post('parse-and-save')
   @HttpCode(HttpStatus.CREATED)
-  @Throttle({ ai: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   parseAndSave(@CurrentUser() user: AuthenticatedUser, @Body() dto: ParseInputDto) {
     return this.ai.parseAndSave({
       userId: user.id,

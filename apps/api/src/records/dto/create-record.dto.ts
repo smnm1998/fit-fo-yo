@@ -36,6 +36,11 @@ export class DietItemInputDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  grams?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
   calories?: number;
 
   @IsOptional()
