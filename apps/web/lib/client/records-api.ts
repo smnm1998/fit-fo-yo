@@ -12,6 +12,7 @@ export type CreateRecordInput = {
     mealType?: string;
     quantity?: number;
     unit?: string;
+    grams?: number;
     calories?: number;
     carbs?: number;
     protein?: number;

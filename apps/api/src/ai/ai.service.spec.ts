@@ -200,8 +200,9 @@ describe('AiService', () => {
       await service.parseAndSave({ userId: 'u1', rawInput: '불닭볶음면 2개' });
 
       const arg = records.createFromParsed.mock.calls[0][0];
-      expect(arg.dietItems[0].calories).toBe(1061); // 408 × (2 × 130) / 100
-      expect(arg.dietItems[0].estimated).toBe(false); // DB 근거 → 추정 아님
+      expect(arg.dietItems[0].calories).toBe(1061);
+      expect(arg.dietItems[0].grams).toBe(260); // 2공기 × 130g
+      expect(arg.dietItems[0].estimated).toBe(false);
     });
 
     it('등록 음식을 g/ml 로 주면 사용자 그램수 × DB 밀도 로 계산한다', async () => {

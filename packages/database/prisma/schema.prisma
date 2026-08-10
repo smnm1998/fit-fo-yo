@@ -66,6 +66,7 @@ model DietItem {
   mealType  MealType?
   quantity  Float?
   unit      String?
+  grams     Int?
   calories  Int?
   carbs     Float?
   protein   Float?
@@ -75,6 +76,7 @@ model DietItem {
 
   @@index([recordId])
 }
+
 
 model ExerciseItem {
   id              String   @id @default(cuid())

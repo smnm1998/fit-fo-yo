@@ -16,6 +16,7 @@ export type DietItem = {
   mealType?: string | null;
   quantity?: number | null;
   unit?: string | null;
+  grams?: number | null;
   calories?: number | null;
   carbs?: number | null;
   protein?: number | null;
