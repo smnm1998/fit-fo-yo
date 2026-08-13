@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
 import { getCurrentUser } from '@/lib/server/user';
-import { currentMonthKST, monthRangeKST, todayKST, weekDayKeysKST } from '@/lib/date';
+import { currentMonthKST, monthRangeKST, todayKST, weekDayKeysAgoKST } from '@/lib/date';
 import { weekStreak } from '@/lib/records';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 
-export const metadata: Metadata = { title: '캘린더 · FitFoYo' };
+export const metadata: Metadata = { title: '캘린더' };
 
 async function getMonthRecords(month: string): Promise<RecordDto[]> {
   const { from, to } = monthRangeKST(month);
@@ -39,7 +39,7 @@ export default async function DashboardPage({
     getMonthRecords(month),
     getMonthRecommendations(month),
   ]);
-  const streak = weekStreak(initialRecords, weekDayKeysKST());
+  const streak = weekStreak(initialRecords, weekDayKeysAgoKST(0));
 
   return (
     <div className="flex flex-col gap-6">
