@@ -80,6 +80,60 @@
   }
 }
 
+@keyframes glowBeat {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.35;
+  }
+  15% {
+    transform: scale(1.12);
+    opacity: 0.6;
+  }
+  30% {
+    transform: scale(0.98);
+    opacity: 0.44;
+  }
+  45% {
+    transform: scale(1.06);
+    opacity: 0.54;
+  }
+  60% {
+    transform: scale(0.95);
+    opacity: 0.4;
+  }
+}
+
+@keyframes glowColor {
+  0%,
+  100% {
+    background-color: #10b981;
+  } /* emerald */
+  20% {
+    background-color: #0ea5e9;
+  } /* sky */
+  40% {
+    background-color: #f59e0b;
+  } /* amber */
+  60% {
+    background-color: #8b5cf6;
+  } /* violet */
+  80% {
+    background-color: #f43f5e;
+  } /* rose */
+}
+
+.hero-glow {
+  animation:
+    glowBeat 2s ease-in-out infinite,
+    glowColor 14s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-glow {
+    animation: none;
+  }
+}
+
 @keyframes chipRise {
   from {
     opacity: 0;
@@ -181,4 +235,34 @@ body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+.title-mark {
+  padding: 0 0.08em;
+  background-image: linear-gradient(transparent 58%, oklch(85% 0.17 162.48) 58%);
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+}
+
+.dark .title-mark {
+  background-image: linear-gradient(transparent 58%, rgba(5, 150, 105, 0.9) 58%); /* emerald-600 */
+}
+
+[data-shown='true'] .title-mark {
+  animation: markerSweep 0.7s ease-out 0.15s both;
+}
+
+@keyframes markerSweep {
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-mark {
+    background-size: 100% 100%;
+  }
+  [data-shown='true'] .title-mark {
+    animation: none;
+  }
 }
