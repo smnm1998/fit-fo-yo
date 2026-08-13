@@ -22,10 +22,6 @@ AI가 알아서 칼로리로 정리하고 하루 단위로 조언을 줍니다.
 ![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white)
 ![Turborepo](https://img.shields.io/badge/Turborepo-EF4444?style=for-the-badge&logo=turborepo&logoColor=white)
 
-<br/>
-
-**[🔗 라이브 데모](https://<배포-도메인>)**
-
 </div>
 
 <br/>
@@ -89,14 +85,12 @@ flowchart LR
 
 ## 📱 UI/UX 미리보기
 
-<!-- 데모 영상 (GitHub 마크다운은 <video>로 임베드됨):
-     A) GitHub 편집기(연필)에 1·2·3.mp4를 드래그 → 생성되는 user-attachments URL을 아래 src에 (가장 확실)
-     B) 커밋 후 raw URL: https://github.com/smnm1998/<레포명>/raw/<브랜치>/apps/web/public/1.mp4 -->
+<!-- 데모 GIF: apps/web/public/*.gif (레포 상대경로 → GitHub에서 자동재생·루프) -->
 
-|                        🗣️ 편한 기록                         |                      🎯 정확한 칼로리                       |                       🗓️ 한눈에 보기                        |
-| :---------------------------------------------------------: | :---------------------------------------------------------: | :---------------------------------------------------------: |
-| <video src="데모-1-URL" width="260" controls muted></video> | <video src="데모-2-URL" width="260" controls muted></video> | <video src="데모-3-URL" width="260" controls muted></video> |
-|                말하듯 적으면 AI가 분류·정산                 |                 DB 근거 계산 + "추정" 배지                  |                    날짜별 기록·합계·추천                    |
+|                                🗣️ 편한 기록                                |                               🎯 정확한 칼로리                               |                              🗓️ 한눈에 보기                              |
+| :------------------------------------------------------------------------: | :--------------------------------------------------------------------------: | :----------------------------------------------------------------------: |
+| <img src="apps/web/public/ai-chat.gif" width="260" alt="AI 자연어 기록" /> | <img src="apps/web/public/calorie.gif" width="260" alt="칼로리 추정·보정" /> | <img src="apps/web/public/calendar.gif" width="260" alt="월간 캘린더" /> |
+|                        말하듯 적으면 AI가 분류·정산                        |                          DB 근거 계산 + "추정" 배지                          |                          날짜별 기록·합계·추천                           |
 
 <br/>
 
