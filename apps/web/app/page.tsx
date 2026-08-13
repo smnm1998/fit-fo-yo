@@ -131,22 +131,6 @@ export default async function Home() {
             />
           </Link>
 
-          {/* 중앙: 소개 섹션 이동 */}
-          <div className="hidden items-center gap-1 md:flex">
-            <a
-              href="#features"
-              className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-subtle hover:text-foreground"
-            >
-              기능
-            </a>
-            <a
-              href="#how"
-              className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-subtle hover:text-foreground"
-            >
-              사용법
-            </a>
-          </div>
-
           {/* 우: 인증 (범위↑) */}
           <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle />

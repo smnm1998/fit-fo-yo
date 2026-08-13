@@ -119,16 +119,20 @@ export function prevWeekDayKeysKST(days = 7): string[] {
   );
 }
 
-/** weeksAgo 주 전 기준, 지난 days일의 'YYYY-MM-DD' (오래된→최신). week=0 이번주, 1 지난주 */
-export function weekDayKeysAgoKST(weeksAgo = 0, days = 7): string[] {
-  const end = subDays(startOfDay(toZonedTime(new Date(), TZ)), weeksAgo * 7);
-  return Array.from({ length: days }, (_, i) => format(subDays(end, days - 1 - i), 'yyyy-MM-dd'));
+/** weeksAgo 주 전의 '일요일~토요일' 달력 주 'YYYY-MM-DD' 배열 (일→토, KST). week=0 이번주 */
+export function weekDayKeysAgoKST(weeksAgo = 0): string[] {
+  const anchor = subDays(toZonedTime(new Date(), TZ), weeksAgo * 7);
+  const start = startOfWeek(anchor, { weekStartsOn: 0 }); // 일요일
+  const end = endOfWeek(anchor, { weekStartsOn: 0 }); // 토요일
+  return eachDayOfInterval({ start, end }).map((d) => format(d, 'yyyy-MM-dd'));
 }
 
-/** weeksAgo 주 전 기준, 지난 days일의 UTC 범위 */
-export function weekRangeAgoKST(weeksAgo = 0, days = 7): { from: string; to: string } {
+/** weeksAgo 주 전의 '일요일 00:00 ~ 토요일 23:59:59.999' UTC 범위 (KST 달력 주) */
+export function weekRangeAgoKST(weeksAgo = 0): { from: string; to: string } {
   const anchor = subDays(toZonedTime(new Date(), TZ), weeksAgo * 7);
-  const from = fromZonedTime(startOfDay(subDays(anchor, days - 1)), TZ).toISOString();
-  const to = fromZonedTime(endOfDay(anchor), TZ).toISOString();
+  const start = startOfWeek(anchor, { weekStartsOn: 0 });
+  const end = endOfWeek(anchor, { weekStartsOn: 0 });
+  const from = fromZonedTime(startOfDay(start), TZ).toISOString();
+  const to = fromZonedTime(endOfDay(end), TZ).toISOString();
   return { from, to };
 }

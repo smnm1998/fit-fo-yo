@@ -1,11 +1,22 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
+export type ChatCard = {
+  kind: 'created' | 'updated' | 'removed';
+  type: 'DIET' | 'EXERCISE';
+  name: string;
+  meal?: string | null;
+  detail: string;
+  estimated?: boolean;
+};
+
 export type ChatMsg = {
   id: string;
   text: string;
   status: 'pending' | 'done' | 'error';
-  summary?: string;
+  reply?: string;
+  suggestions?: string[];
+  cards?: ChatCard[];
   error?: string;
 };
 

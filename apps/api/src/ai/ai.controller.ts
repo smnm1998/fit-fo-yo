@@ -4,6 +4,7 @@ import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser, type AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { ParseInputDto } from './dto/parse-input.dto';
+import { ChatDto } from './dto/chat.dto';
 
 @UseGuards(JwtAccessGuard)
 @Controller('ai')
@@ -22,6 +23,17 @@ export class AiController {
       userId: user.id,
       rawInput: dto.rawInput,
       fallbackRecordedAt: dto.recordedAt,
+    });
+  }
+
+  @Post('chat')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
+  chat(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChatDto) {
+    return this.ai.chat({
+      userId: user.id,
+      messages: dto.messages,
+      recordedAt: dto.recordedAt,
     });
   }
 }

@@ -1,5 +1,5 @@
 import { request } from '@/lib/client/auth-api';
-import type { RecordDto } from '@/lib/types';
+import type { RecordDto, AiChatTurn, AiChatResponse } from '@/lib/types';
 
 export { ApiError } from '@/lib/client/auth-api';
 
@@ -27,6 +27,14 @@ export type CreateRecordInput = {
     estimated?: boolean;
   }[];
 };
+
+export function aiChat(messages: AiChatTurn[], recordedAt?: string): Promise<AiChatResponse> {
+  return request<AiChatResponse>('/api/ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages, ...(recordedAt ? { recordedAt } : {}) }),
+  });
+}
 
 export type UpdateRecordInput = {
   recordedAt?: string;

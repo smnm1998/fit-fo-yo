@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import type {
   ChatCompletion,
+  ChatCompletionCreateParams,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from 'openai/resources/chat/completions';
@@ -60,5 +61,26 @@ export class OpenAIClient {
 
     this.logger.debug(`OpenAI usage (chatText): ${JSON.stringify(response.usage)}`);
     return response.choices[0]?.message.content?.trim() ?? '';
+  }
+
+  /**
+   * 범용 chat 호출, 에이전트 루프용 - messages를 통째로 받고, tools 또는 response_format을 그대로 통과
+   */
+  async chat(params: {
+    messages: ChatCompletionMessageParam[];
+    tools?: ChatCompletionTool[];
+    toolChoice?: 'auto' | 'required' | 'none';
+    responseFormat?: ChatCompletionCreateParams['response_format'];
+    temperature?: number;
+  }): Promise<ChatCompletion> {
+    const response = await this.client.chat.completions.create({
+      model: this.model,
+      messages: params.messages,
+      ...(params.tools ? { tools: params.tools, tool_choice: params.toolChoice ?? 'auto' } : {}),
+      ...(params.responseFormat ? { response_format: params.responseFormat } : {}),
+      temperature: params.temperature ?? 0.3,
+    });
+    this.logger.debug(`OpenAI usage (chat): ${JSON.stringify(response.usage)}`);
+    return response;
   }
 }

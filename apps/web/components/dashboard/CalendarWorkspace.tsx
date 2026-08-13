@@ -25,7 +25,7 @@ const STYLES = {
   month: 'px-1 text-lg font-bold tabular-nums text-foreground',
   todayBtn:
     'ml-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground',
-  splitGrid: 'grid gap-6 lg:grid-cols-[1fr_20rem]',
+  splitGrid: 'grid gap-6 lg:grid-cols-[1fr_24rem]',
   skeleton: 'h-[22rem] animate-pulse rounded-2xl bg-subtle',
 } as const;
 

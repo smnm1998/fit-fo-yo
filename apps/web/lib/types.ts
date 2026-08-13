@@ -76,3 +76,15 @@ export type HealthProfileDto = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type AiChatTurn = { role: 'user' | 'assistant'; content: string };
+
+export type AiChatResponse = {
+  reply: string;
+  suggestions: string[];
+  mutations: {
+    created: RecordDto[];
+    updated: RecordDto[];
+    deletedIds: string[];
+  };
+};
