@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
+import { useChatStore } from '@/lib/store/chat-store';
 
 export function GuestDemoButton({
   className,
@@ -18,6 +19,7 @@ export function GuestDemoButton({
     try {
       const res = await fetch('/api/auth/guest', { method: 'POST' });
       if (!res.ok) throw new Error('guest issue failed');
+      useChatStore.getState().reset();
       router.push('/dashboard');
       router.refresh();
     } catch {

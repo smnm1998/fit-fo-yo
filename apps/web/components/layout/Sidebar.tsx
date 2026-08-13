@@ -22,6 +22,7 @@ import { cn } from '@/lib/cn';
 import { logout } from '@/lib/client/auth-api';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useUiStore } from '@/lib/store/ui-store';
+import { useChatStore } from '@/lib/store/chat-store';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 
 const NAV = [
@@ -84,6 +85,7 @@ export function Sidebar() {
       await logout();
     } finally {
       clear();
+      useChatStore.getState().reset();
       router.replace('/login');
       router.refresh();
     }

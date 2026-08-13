@@ -1,8 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowLeft, Send, Salad, Activity, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-
 import { aiChat, ApiError } from '@/lib/client/records-api';
 import { useRecordsStore } from '@/lib/store/records-store';
 import { useChatStore, type ChatMsg, type ChatCard } from '@/lib/store/chat-store';
@@ -41,6 +41,7 @@ const S = {
   genIcon: cn('grid place-items-center text-emerald-500 dark:text-emerald-400', GLOW),
   genInner: 'inline-grid origin-center animate-[genPulse_3.4s_ease-in-out_infinite]',
 
+  cta: 'inline-flex items-center rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-surface transition-opacity hover:opacity-90',
   card: 'flex min-w-[240px] items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2.5',
   cardRemoved: 'border-dashed opacity-60',
   cardIco: 'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
@@ -192,8 +193,9 @@ export function ChatView({ recordedAt, onBack }: Props) {
         cards,
       });
     } catch (err) {
+      const isQuota = err instanceof ApiError && err.status === 403;
       const error = err instanceof ApiError ? err.message : '기록에 실패했어요.';
-      patch(recordedAt, id, { status: 'error', error });
+      patch(recordedAt, id, { status: 'error', error, quota: isQuota });
     } finally {
       setSending(false);
     }
@@ -269,7 +271,14 @@ export function ChatView({ recordedAt, onBack }: Props) {
                   <span className={S.botMark}>
                     <AiMark size={20} />
                   </span>
-                  <p className={S.botError}>{m.error}</p>
+                  <div className="flex flex-col items-start gap-1.5">
+                    <p className={S.botError}>{m.error}</p>
+                    {m.quota && (
+                      <Link href="/signup" className={S.cta}>
+                        회원가입하고 계속하기 →
+                      </Link>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
