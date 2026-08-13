@@ -3,6 +3,7 @@ import { BadRequestException, InternalServerErrorException } from '@nestjs/commo
 import { RecordType } from '@fitfoyo/database';
 import { AiService } from './ai.service';
 import { OpenAIClient } from './openai.client';
+import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 
@@ -37,6 +38,10 @@ describe('AiService', () => {
         { provide: OpenAIClient, useValue: openai },
         { provide: RecordsService, useValue: records },
         { provide: NutritionService, useValue: nutrition },
+        {
+          provide: PrismaService,
+          useValue: { user: { findUnique: jest.fn(), update: jest.fn() } },
+        },
       ],
     }).compile();
 
