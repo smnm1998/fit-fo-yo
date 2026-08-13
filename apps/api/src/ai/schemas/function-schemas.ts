@@ -76,73 +76,123 @@ const exerciseItemSchema = {
   additionalProperties: false,
 } as const;
 
+const recordDietTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'record_diet',
+    description: '사용자가 식단/음식 섭취를 기록하려고 할 때 호출합니다.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', description: '섭취한 음식 항목들', items: dietItemSchema },
+        recordedAt: {
+          type: 'string',
+          format: 'date-time',
+          description: 'ISO8601 시각. 추론 불가하면 생략.',
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  },
+};
+
+const recordExerciseTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'record_exercise',
+    description: '사용자가 운동을 기록하려고 할 때 호출합니다.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', description: '수행한 운동 항목들', items: exerciseItemSchema },
+        recordedAt: {
+          type: 'string',
+          format: 'date-time',
+          description: 'ISO8601 시각. 추론 불가하면 생략.',
+        },
+      },
+      required: ['items'],
+      additionalProperties: false,
+    },
+  },
+};
+
+const recordInvalidDomainTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'record_invalid_domain',
+    description: '입력이 식단/운동 헬스케어 도메인 밖일 때 호출합니다.',
+    parameters: {
+      type: 'object',
+      properties: {
+        reason: { type: 'string', description: '간단한 이유 (예: "일상 잡담", "코딩 질문")' },
+      },
+      required: ['reason'],
+      additionalProperties: false,
+    },
+  },
+};
+
+const updateRecordTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'update_record',
+    description:
+      '기존 기록을 수정할 때 호출합니다. recordId는 "이 날의 기록" 컨텍스트의 id를 사용하세요. ' +
+      '식단이면 dietItems를, 운동이면 exerciseItems를 "수정 후의 전체 항목"으로 채웁니다.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: { type: 'string', description: '수정할 기록의 id' },
+        dietItems: {
+          type: 'array',
+          description: '식단 기록일 때: 수정 후 음식 항목 전체',
+          items: dietItemSchema,
+        },
+        exerciseItems: {
+          type: 'array',
+          description: '운동 기록일 때: 수정 후 운동 항목 전체',
+          items: exerciseItemSchema,
+        },
+        recordedAt: { type: 'string', format: 'date-time', description: '시각 변경 시에만' },
+      },
+      required: ['recordId'],
+      additionalProperties: false,
+    },
+  },
+};
+
+const deleteRecordTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'delete_record',
+    description:
+      '기존 기록을 삭제할 때 호출합니다. recordId는 "이 날의 기록" 컨텍스트의 id를 사용하세요.',
+    parameters: {
+      type: 'object',
+      properties: {
+        recordId: { type: 'string', description: '삭제할 기록의 id' },
+      },
+      required: ['recordId'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/** 레거시 단발 파싱(parse-and-save)용 */
 export const PARSE_RECORD_TOOLS: ChatCompletionTool[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'record_diet',
-      description: '사용자가 식단/음식 섭취를 기록하려고 할 때 호출합니다.',
-      parameters: {
-        type: 'object',
-        properties: {
-          items: {
-            type: 'array',
-            description: '섭취한 음식 항목들',
-            items: dietItemSchema,
-          },
-          recordedAt: {
-            type: 'string',
-            format: 'date-time',
-            description: 'ISO8601 시각. 추론 불가하면 생략.',
-          },
-        },
-        required: ['items'],
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'record_exercise',
-      description: '사용자가 운동을 기록하려고 할 때 호출합니다.',
-      parameters: {
-        type: 'object',
-        properties: {
-          items: {
-            type: 'array',
-            description: '수행한 운동 항목들',
-            items: exerciseItemSchema,
-          },
-          recordedAt: {
-            type: 'string',
-            format: 'date-time',
-            description: 'ISO8601 시각. 추론 불가하면 생략.',
-          },
-        },
-        required: ['items'],
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'record_invalid_domain',
-      description: '입력이 식단/운동 헬스케어 도메인 밖일 때 호출합니다.',
-      parameters: {
-        type: 'object',
-        properties: {
-          reason: {
-            type: 'string',
-            description: '간단한 이유 (예: "일상 잡담", "코딩 질문")',
-          },
-        },
-        required: ['reason'],
-        additionalProperties: false,
-      },
-    },
-  },
+  recordDietTool,
+  recordExerciseTool,
+  recordInvalidDomainTool,
+];
+
+/** 대화형 에이전트용: 생성 + 수정 + 삭제 (도메인 이탈은 자연어로 처리하므로 invalid_domain 제외) */
+export const CHAT_AGENT_TOOLS: ChatCompletionTool[] = [
+  recordDietTool,
+  recordExerciseTool,
+  updateRecordTool,
+  deleteRecordTool,
 ];
 
 export type ParsedDietPayload = {
@@ -178,3 +228,12 @@ export type ParsedResult =
   | { kind: 'diet'; payload: ParsedDietPayload }
   | { kind: 'exercise'; payload: ParsedExercisePayload }
   | { kind: 'invalid_domain'; reason: string };
+
+export type UpdateRecordPayload = {
+  recordId: string;
+  dietItems?: ParsedDietPayload['items'];
+  exerciseItems?: ParsedExercisePayload['items'];
+  recordedAt?: string;
+};
+
+export type DeleteRecordPayload = { recordId: string };
