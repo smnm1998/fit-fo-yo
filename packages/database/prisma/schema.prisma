@@ -29,6 +29,7 @@ model User {
   provider     String?  @default("local")
   providerId   String?
   isGuest      Boolean  @default(false)
+  aiUsageCount Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

@@ -1,10 +1,12 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { Prisma, RecordType } from '@fitfoyo/database';
+import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { OpenAIClient } from './openai.client';
 import { PARSE_RECORD_SYSTEM_PROMPT } from './prompts/parse-record.system';
@@ -26,6 +28,9 @@ import { UpdateRecordDto } from '../records/dto/update-record.dto';
 /** 체중 미상 사용자 기본값. HealthProfile 연동 시 대체 예정. */
 const DEFAULT_WEIGHT_KG = 65;
 
+/** 게스트 AI 사용 상한 (체험용). 초과 시 회원가입 유도. */
+const GUEST_AI_LIMIT = 10;
+
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
@@ -34,6 +39,7 @@ export class AiService {
     private readonly openai: OpenAIClient,
     private readonly records: RecordsService,
     private readonly nutrition: NutritionService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -83,8 +89,15 @@ export class AiService {
    * 파싱 + Records 저장. 컨트롤러에서 호출하는 메인 진입점.
    * 식단+운동이 함께면 각각 저장 -> 생성된 레코드 배열 반환
    */
-  async parseAndSave(params: { userId: string; rawInput: string; fallbackRecordedAt?: string }) {
+  async parseAndSave(params: {
+    userId: string;
+    isGuest?: boolean;
+    rawInput: string;
+    fallbackRecordedAt?: string;
+  }) {
+    await this.assertGuestQuota({ id: params.userId, isGuest: params.isGuest });
     const results = await this.parse(params.rawInput);
+    await this.bumpGuestUsage({ id: params.userId, isGuest: params.isGuest });
     const valid = results.filter(
       (r): r is Extract<ParsedResult, { kind: 'diet' | 'exercise' }> => r.kind !== 'invalid_domain',
     );
@@ -113,8 +126,30 @@ export class AiService {
     );
   }
 
-  // ───────── 생성/수정 공용 헬퍼 (parse-and-save & chat) ─────────
+  /** 게스트 AI 사용 상한 가드. 회원(isGuest=false/undefined)은 no-op. */
+  private async assertGuestQuota(user: { id: string; isGuest?: boolean }) {
+    if (!user.isGuest) return;
+    const row = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { aiUsageCount: true },
+    });
+    if ((row?.aiUsageCount ?? 0) >= GUEST_AI_LIMIT) {
+      throw new ForbiddenException(
+        `게스트는 AI를 ${GUEST_AI_LIMIT}회까지 체험할 수 있어요. 회원가입하면 계속 사용할 수 있어요.`,
+      );
+    }
+  }
 
+  /** 게스트만 사용 횟수 +1 (회원은 no-op). */
+  private async bumpGuestUsage(user: { id: string; isGuest?: boolean }) {
+    if (!user.isGuest) return;
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { aiUsageCount: { increment: 1 } },
+    });
+  }
+
+  // ───────── 생성/수정 공용 헬퍼 (parse-and-save & chat) ─────────
   private toDietItemInput(
     item: ParsedDietPayload['items'][number],
     table: Map<string, FoodNutrition>,
@@ -291,10 +326,12 @@ export class AiService {
 
   async chat(params: {
     userId: string;
+    isGuest?: boolean;
     messages: Array<{ role: 'user' | 'assistant'; content: string }>;
     recordedAt?: string;
   }) {
     const { userId, recordedAt } = params;
+    await this.assertGuestQuota({ id: userId, isGuest: params.isGuest });
     const history = params.messages.slice(-12);
     const lastUser = [...history].reverse().find((m) => m.role === 'user')?.content ?? '';
 
@@ -319,6 +356,8 @@ export class AiService {
       toolChoice: 'auto',
       temperature: 0.2,
     });
+    await this.bumpGuestUsage({ id: userId, isGuest: params.isGuest }); // 첫 호출 성공 → 이 턴 1회 카운트
+
     const assistantMsg = first.choices[0]?.message;
     const functionCalls = (assistantMsg?.tool_calls ?? []).filter((c) => c.type === 'function');
 

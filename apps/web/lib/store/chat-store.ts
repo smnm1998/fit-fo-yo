@@ -18,6 +18,7 @@ export type ChatMsg = {
   suggestions?: string[];
   cards?: ChatCard[];
   error?: string;
+  quota?: boolean;
 };
 
 type ChatState = {
@@ -25,6 +26,7 @@ type ChatState = {
   append: (date: string, msg: ChatMsg) => void;
   patch: (date: string, id: string, patch: Partial<ChatMsg>) => void;
   clear: (date: string) => void;
+  reset: () => void;
 };
 
 export const useChatStore = create<ChatState>()(
@@ -46,6 +48,7 @@ export const useChatStore = create<ChatState>()(
           delete next[date];
           return { byDate: next };
         }),
+      reset: () => set({ byDate: {} }),
     }),
     {
       name: 'fitfoyo-chat',

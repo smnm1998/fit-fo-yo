@@ -21,6 +21,7 @@ export class AiController {
   parseAndSave(@CurrentUser() user: AuthenticatedUser, @Body() dto: ParseInputDto) {
     return this.ai.parseAndSave({
       userId: user.id,
+      isGuest: user.isGuest,
       rawInput: dto.rawInput,
       fallbackRecordedAt: dto.recordedAt,
     });
@@ -32,6 +33,7 @@ export class AiController {
   chat(@CurrentUser() user: AuthenticatedUser, @Body() dto: ChatDto) {
     return this.ai.chat({
       userId: user.id,
+      isGuest: user.isGuest,
       messages: dto.messages,
       recordedAt: dto.recordedAt,
     });
