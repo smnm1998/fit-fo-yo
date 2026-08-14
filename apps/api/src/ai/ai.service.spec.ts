@@ -3,7 +3,9 @@ import { BadRequestException, InternalServerErrorException } from '@nestjs/commo
 import { RecordType } from '@fitfoyo/database';
 import { AiService } from './ai.service';
 import { OpenAIClient } from './openai.client';
+import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
+import { NutritionService } from '../nutrition/nutrition.service';
 
 /** OpenAI chat.completions tool_call 응답을 흉내내는 헬퍼 */
 function toolCallResponse(name: string, args: unknown) {
@@ -22,16 +24,24 @@ describe('AiService', () => {
   let service: AiService;
   let openai: { chatWithTools: jest.Mock };
   let records: { createFromParsed: jest.Mock };
+  let nutrition: { lookupMany: jest.Mock };
 
   beforeEach(async () => {
     openai = { chatWithTools: jest.fn() };
     records = { createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })) };
+    // 기본: 시드 미등록(빈 Map) → LLM 재계산 폴백. 등록 케이스는 테스트마다 override.
+    nutrition = { lookupMany: jest.fn().mockResolvedValue(new Map()) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AiService,
         { provide: OpenAIClient, useValue: openai },
         { provide: RecordsService, useValue: records },
+        { provide: NutritionService, useValue: nutrition },
+        {
+          provide: PrismaService,
+          useValue: { user: { findUnique: jest.fn(), update: jest.fn() } },
+        },
       ],
     }).compile();
 
@@ -47,10 +57,10 @@ describe('AiService', () => {
       );
 
       const result = await service.parse('닭가슴살 한 그릇');
-
-      expect(result.kind).toBe('diet');
-      if (result.kind === 'diet') {
-        expect(result.payload.items[0].name).toBe('닭가슴살');
+      const [first] = result;
+      expect(first?.kind).toBe('diet');
+      if (first?.kind === 'diet') {
+        expect(first.payload.items[0]?.name).toBe('닭가슴살');
       }
     });
 
@@ -62,8 +72,7 @@ describe('AiService', () => {
       );
 
       const result = await service.parse('30분 러닝');
-
-      expect(result.kind).toBe('exercise');
+      expect(result[0]?.kind).toBe('exercise');
     });
 
     it('record_invalid_domain 은 invalid_domain + reason 으로 분류한다', async () => {
@@ -71,11 +80,10 @@ describe('AiService', () => {
         toolCallResponse('record_invalid_domain', { reason: '일상 잡담' }),
       );
 
-      const result = await service.parse('내일 날씨 어때?');
-
-      expect(result.kind).toBe('invalid_domain');
-      if (result.kind === 'invalid_domain') {
-        expect(result.reason).toBe('일상 잡담');
+      const [first] = await service.parse('내일 날씨 어때?');
+      expect(first?.kind).toBe('invalid_domain');
+      if (first?.kind === 'invalid_domain') {
+        expect(first.reason).toBe('일상 잡담');
       }
     });
 
@@ -142,6 +150,92 @@ describe('AiService', () => {
 
       const arg = records.createFromParsed.mock.calls[0][0];
       expect(arg.recordedAt).toEqual(new Date('2026-05-31T08:00:00+09:00'));
+    });
+  });
+
+  describe('칼로리 재계산 / grounding', () => {
+    it('미등록 음식은 caloriesPer100g × gramsEstimate 로 재계산한다 (LLM 폴백)', async () => {
+      // lookupMany 기본 mock = 빈 Map → 폴백 경로
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '수제김치찌개', // 시드에 없는 이름
+              quantity: 1,
+              unit: '인분',
+              gramsEstimate: 400,
+              caloriesPer100g: 55,
+              calories: 999, // LLM 이 잘못 계산한 값
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '수제김치찌개' });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(220); // 55 × 400 / 100
+      expect(arg.dietItems[0].estimated).toBe(true); // 폴백이라 추정 유지
+    });
+
+    it('등록 음식(개/봉지)은 DB 근거값 × 수량 으로 grounding 한다 (불닭 4000→1061)', async () => {
+      // 실제 시드값: 불닭볶음면 { caloriesPer100g: 408, gramsPerServing: 130 }
+      nutrition.lookupMany.mockResolvedValue(
+        new Map([
+          ['불닭볶음면', { name: '불닭볶음면', caloriesPer100g: 408, gramsPerServing: 130 }],
+        ]),
+      );
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '불닭볶음면',
+              quantity: 2,
+              unit: '개',
+              gramsEstimate: 550, // LLM 이 라면 기준으로 잘못 준 그램수
+              caloriesPer100g: 700, // LLM 환각
+              calories: 4000, // 무시되어야 함
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '불닭볶음면 2개' });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(1061);
+      expect(arg.dietItems[0].grams).toBe(260); // 2공기 × 130g
+      expect(arg.dietItems[0].estimated).toBe(false);
+    });
+
+    it('등록 음식을 g/ml 로 주면 사용자 그램수 × DB 밀도 로 계산한다', async () => {
+      // 실제 시드값: 닭가슴살 { caloriesPer100g: 165, gramsPerServing: 100 }
+      nutrition.lookupMany.mockResolvedValue(
+        new Map([['닭가슴살', { name: '닭가슴살', caloriesPer100g: 165, gramsPerServing: 100 }]]),
+      );
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '닭가슴살',
+              quantity: 200,
+              unit: 'g',
+              gramsEstimate: 200, // 무게 직접 지정 → g 분기에서 신뢰
+              caloriesPer100g: 999, // LLM 값은 무시, DB 165 사용
+              calories: 1998,
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '닭가슴살 200g' });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(330); // 165 × 200 / 100
+      expect(arg.dietItems[0].estimated).toBe(false);
     });
   });
 });

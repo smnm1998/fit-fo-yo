@@ -2,7 +2,7 @@ import { ConflictException, Injectable, Logger, UnauthorizedException } from '@n
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { User } from '@fitfoyo/database';
-import type { StringValue } from 'ms';
+import type { StringValue } from '../common/duration';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
@@ -187,5 +187,15 @@ export class AuthService {
       where: { id: userId },
       data: { refreshTokenHash: hash },
     });
+  }
+
+  /** /auth/me 전용 — 가드가 더는 프로필을 싣지 않으므로 여기서 조회 */
+  async getProfile(userId: string): Promise<AuthUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, nickname: true, isGuest: true },
+    });
+    if (!user) throw new UnauthorizedException();
+    return user;
   }
 }

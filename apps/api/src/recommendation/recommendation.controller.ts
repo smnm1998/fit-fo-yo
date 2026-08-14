@@ -2,6 +2,7 @@ import { Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@
 import { JwtAccessGuard } from 'src/auth/guards/jwt-access.guard';
 import { RecommendationService } from './recommendation.service';
 import { RecommendationCron } from './recommendation.cron';
+import { Throttle } from '@nestjs/throttler';
 import { type AuthenticatedUser, CurrentUser } from 'src/auth/decorators/current-user.decorator';
 
 @UseGuards(JwtAccessGuard)
@@ -34,9 +35,18 @@ export class RecommendationController {
     return this.cron.runManually();
   }
 
+  /** 현재 유저의 오늘 추천 즉시 생성(어제 기록 기반), 게스트 포함, runForAllUsers 우회 */
+  @Post('generate')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  generate(@CurrentUser() user: AuthenticatedUser) {
+    return this.recommendation.generateForUser(user.id, this.todayDateOnly());
+  }
+
   /** forDate는 @db.Date라서 시각 제거한 00:00 UTC로 정규화 */
   private todayDateOnly(): Date {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const KST = 9 * 60 * 60 * 1000;
+    const k = new Date(Date.now() + KST);
+    return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
   }
 }

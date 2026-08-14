@@ -42,4 +42,4 @@ yarn-error.log*
 
 # Test artifacts
 cookies.txt
-*_cookies.txt
+*cookies.txt

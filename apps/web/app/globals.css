@@ -1,21 +1,268 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f9f9f9;
+  --surface: #ffffff;
+  --foreground: #2a2a2a;
+  --muted: #737373;
+  --subtle: #f3f3f3;
+  --border: #e5e5e5;
+  --accent: #2a2a2a;
+  --danger: #dc2626;
+}
+.dark {
+  --background: #1a1a1a;
+  --surface: #242424;
+  --foreground: #ededed;
+  --muted: #9a9a9a;
+  --subtle: #2e2e2e;
+  --border: #383838;
+  --accent: #ededed;
+  --danger: #f87171;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+}
 
 @theme {
-  --color-background: #f9f9f9;
-  --color-surface: #ffffff;
-  --color-foreground: #171717;
-  --color-muted: #737373;
-  --color-subtle: #f3f3f3;
-  --color-border: #e5e5e5;
-  --color-accent: #171717;
-  --color-danger: #dc2626;
-
-  --font-sans: var(--font-pretendard), system-ui, sans-serif;
+  --font-sans: var(--font-sans-kr), system-ui, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', monospace;
+}
+
+@keyframes genPulse {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  10% {
+    transform: rotate(0deg) scale(0.62);
+  }
+  18% {
+    transform: rotate(90deg) scale(0.62);
+  }
+  25% {
+    transform: rotate(90deg) scale(1);
+  }
+  35% {
+    transform: rotate(90deg) scale(0.62);
+  }
+  43% {
+    transform: rotate(180deg) scale(0.62);
+  }
+  50% {
+    transform: rotate(180deg) scale(1);
+  }
+  60% {
+    transform: rotate(180deg) scale(0.62);
+  }
+  68% {
+    transform: rotate(270deg) scale(0.62);
+  }
+  75% {
+    transform: rotate(270deg) scale(1);
+  }
+  85% {
+    transform: rotate(270deg) scale(0.62);
+  }
+  93% {
+    transform: rotate(360deg) scale(0.62);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes glowBeat {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.35;
+  }
+  15% {
+    transform: scale(1.12);
+    opacity: 0.6;
+  }
+  30% {
+    transform: scale(0.98);
+    opacity: 0.44;
+  }
+  45% {
+    transform: scale(1.06);
+    opacity: 0.54;
+  }
+  60% {
+    transform: scale(0.95);
+    opacity: 0.4;
+  }
+}
+
+@keyframes glowColor {
+  0%,
+  100% {
+    background-color: #10b981;
+  } /* emerald */
+  20% {
+    background-color: #0ea5e9;
+  } /* sky */
+  40% {
+    background-color: #f59e0b;
+  } /* amber */
+  60% {
+    background-color: #8b5cf6;
+  } /* violet */
+  80% {
+    background-color: #f43f5e;
+  } /* rose */
+}
+
+.hero-glow {
+  animation:
+    glowBeat 2s ease-in-out infinite,
+    glowColor 14s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-glow {
+    animation: none;
+  }
+}
+
+@keyframes chipRise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes viewInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes viewInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes wave {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10%,
+  30%,
+  50% {
+    transform: rotate(14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(-8deg);
+  }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+.title-mark {
+  padding: 0 0.08em;
+  background-image: linear-gradient(transparent 58%, oklch(85% 0.17 162.48) 58%);
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+}
+
+.dark .title-mark {
+  background-image: linear-gradient(transparent 58%, rgba(5, 150, 105, 0.9) 58%); /* emerald-600 */
+}
+
+[data-shown='true'] .title-mark {
+  animation: markerSweep 0.7s ease-out 0.15s both;
+}
+
+@keyframes markerSweep {
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-mark {
+    background-size: 100% 100%;
+  }
+  [data-shown='true'] .title-mark {
+    animation: none;
+  }
 }

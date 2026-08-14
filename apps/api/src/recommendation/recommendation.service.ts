@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma, RecordType } from '@fitfoyo/database';
+import { HealthProfile, Prisma, RecordType } from '@fitfoyo/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { OpenAIClient } from '../ai/openai.client';
 import { DAILY_RECOMMENDATION_SYSTEM_PROMPT } from './prompts/daily-recommendation.system';
@@ -32,7 +32,8 @@ export class RecommendationService {
    * 어제 records 0건이면 skip (불필요한 OpenAI 호출 방지).
    */
   async generateForUser(userId: string, forDate: Date) {
-    const { start, end } = this.yesterdayRange(forDate);
+    const targetDate = this.toKSTDateOnly(forDate);
+    const { start, end } = this.yesterdayRange(targetDate);
 
     const records = await this.prisma.record.findMany({
       where: { userId, recordedAt: { gte: start, lte: end } },
@@ -46,13 +47,14 @@ export class RecommendationService {
 
     const summary = this.aggregate(records);
     const focus = this.decideFocus(summary);
-    const message = await this.buildMessage(summary, focus);
+    const profile = await this.prisma.healthProfile.findUnique({ where: { userId } });
+    const message = await this.buildMessage(summary, focus, this.buildHealthContext(profile));
 
     const payload = { message, focus, summary } satisfies Prisma.InputJsonValue;
 
     return this.prisma.recommendation.upsert({
-      where: { userId_forDate: { userId, forDate } },
-      create: { userId, forDate, payload },
+      where: { userId_forDate: { userId, forDate: targetDate } },
+      create: { userId, forDate: targetDate, payload },
       update: { payload },
     });
   }
@@ -150,8 +152,12 @@ export class RecommendationService {
     return 'balanced';
   }
 
-  private async buildMessage(s: DailySummary, focus: RecommendationFocus): Promise<string> {
-    const context = [
+  private async buildMessage(
+    s: DailySummary,
+    focus: RecommendationFocus,
+    health: string | null,
+  ): Promise<string> {
+    const lines = [
       `어제 기록 요약:`,
       `- 총 섭취 칼로리: ${s.totalCalories} kcal`,
       `- 탄수화물 ${s.carbs}g / 단백질 ${s.protein}g / 지방 ${s.fat}g`,
@@ -159,11 +165,19 @@ export class RecommendationService {
       `- 식단 ${s.dietCount}건 / 운동 ${s.exerciseCount}건`,
       ``,
       `오늘 중점(focus): ${focus}`,
-    ].join('\n');
+    ];
+    if (health) {
+      lines.push(
+        '',
+        health,
+        '',
+        '위 건강 정보를 고려해 개인화하고, 고질병/주의사항에 어긋나는 권유는 피하세요.',
+      );
+    }
 
     const message = await this.openai.chatText({
       system: DAILY_RECOMMENDATION_SYSTEM_PROMPT,
-      user: context,
+      user: lines.join('\n'),
     });
 
     return message || '어제 기록을 바탕으로 오늘도 균형 잡힌 식단과 가벼운 운동을 추천해요.';
@@ -185,5 +199,25 @@ export class RecommendationService {
       start: new Date(startKst - KST_OFFSET_MS),
       end: new Date(endKst - KST_OFFSET_MS),
     };
+  }
+
+  /** 프로필 → 프롬프트용 건강 컨텍스트. 값 없으면 null(빈 문자열 주입 방지). */
+  private buildHealthContext(profile: HealthProfile | null): string | null {
+    if (!profile) return null;
+    const lines: string[] = [];
+    if (profile.heightCm) lines.push(`- 키: ${profile.heightCm}cm`);
+    if (profile.weightKg) lines.push(`- 몸무게: ${profile.weightKg}kg`);
+    if (profile.heightCm && profile.weightKg) {
+      const h = profile.heightCm / 100;
+      lines.push(`- BMI: ${(profile.weightKg / (h * h)).toFixed(1)}`);
+    }
+    if (profile.conditions?.trim()) lines.push(`- 고질병/주의사항: ${profile.conditions.trim()}`);
+    return lines.length ? ['사용자 건강 정보:', ...lines].join('\n') : null;
+  }
+
+  private toKSTDateOnly(d: Date): Date {
+    const KST = 9 * 60 * 60 * 1000;
+    const k = new Date(d.getTime() + KST);
+    return new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
   }
 }
