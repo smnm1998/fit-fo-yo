@@ -87,10 +87,29 @@ flowchart LR
 
 <!-- 데모 GIF: apps/web/public/*.gif (레포 상대경로 → GitHub에서 자동재생·루프) -->
 
-|                                🗣️ 편한 기록                                |                               🎯 정확한 칼로리                               |                              🗓️ 한눈에 보기                              |
-| :------------------------------------------------------------------------: | :--------------------------------------------------------------------------: | :----------------------------------------------------------------------: |
-| <img src="apps/web/public/ai-chat.gif" width="260" alt="AI 자연어 기록" /> | <img src="apps/web/public/calorie.gif" width="260" alt="칼로리 추정·보정" /> | <img src="apps/web/public/calendar.gif" width="260" alt="월간 캘린더" /> |
-|                        말하듯 적으면 AI가 분류·정산                        |                          DB 근거 계산 + "추정" 배지                          |                          날짜별 기록·합계·추천                           |
+<table>
+  <tr>
+    <td width="62%"><img src="apps/web/public/ai-chat.gif" width="480" alt="AI 자연어 기록" /></td>
+    <td valign="middle">
+      <h3>🗣️ 편한 기록</h3>
+      말하듯 한 줄 적으면 AI가 식단·운동을 각각 구분해 기록하고,<br/>수정·삭제도 대화로 처리합니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="62%"><img src="apps/web/public/calorie.gif" width="480" alt="칼로리 추정·보정" /></td>
+    <td valign="middle">
+      <h3>🎯 양심적인 칼로리 계산</h3>
+      등록 음식은 실제 영양 DB로 재계산하고,<br/>없는 음식은 <b>추정</b> 배지로 정직하게 표시합니다.
+    </td>
+  </tr>
+  <tr>
+    <td width="62%"><img src="apps/web/public/calendar.gif" width="480" alt="월간 캘린더" /></td>
+    <td valign="middle">
+      <h3>🗓️ 한눈에 보기</h3>
+      날짜별 끼니 정리·칼로리 합계·맞춤 추천을<br/>달력 한 화면에서 확인합니다.
+    </td>
+  </tr>
+</table>
 
 <br/>
 
