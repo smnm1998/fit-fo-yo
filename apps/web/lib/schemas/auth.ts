@@ -18,6 +18,7 @@ export const signupSchema = z
       .string()
       .min(2, '닉네임은 2~10자로 입력하세요.')
       .max(10, '닉네임은 2~10자로 입력하세요.'),
+    agree: z.literal(true, { error: '이용약관과 개인정보처리방침에 동의해주세요.' }),
   })
   .refine((d) => d.password === d.passwordConfirm, {
     error: '비밀번호가 일치하지 않습니다.',
