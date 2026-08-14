@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { ArrowLeft, Send, Salad, Activity, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { aiChat, ApiError } from '@/lib/client/records-api';
@@ -10,13 +9,14 @@ import { useTypewriter } from '@/lib/hooks/useTypewriter';
 import { cn } from '@/lib/cn';
 import { RECORD_TYPE_META, recordName, recordTotalKcal, recordMealLabel } from '@/lib/record-meta';
 import type { AiChatTurn, RecordDto } from '@/lib/types';
+import { logout } from '@/lib/client/auth-api';
 
 const EMPTY: ChatMsg[] = [];
 const GLOW = 'drop-shadow-[0_1px_5px_rgba(16,185,129,0.30)]';
 
-const S = {
+const STYLES = {
   panel:
-    'relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-background animate-[viewInRight_220ms_ease-out]',
+    'relative flex h-[calc(100dvh-11rem)] flex-col overflow-hidden rounded-2xl border border-border bg-background animate-[viewInRight_220ms_ease-out]',
 
   head: 'flex items-center gap-2 px-3.5 py-3',
   back: 'grid h-9 w-9 place-items-center rounded-full border border-border bg-surface text-foreground transition-colors hover:bg-subtle',
@@ -40,6 +40,12 @@ const S = {
   gen: 'flex items-center gap-2.5 text-xs text-muted',
   genIcon: cn('grid place-items-center text-emerald-500 dark:text-emerald-400', GLOW),
   genInner: 'inline-grid origin-center animate-[genPulse_3.4s_ease-in-out_infinite]',
+
+  gate: 'absolute inset-0 z-30 flex flex-col items-center justify-center gap-2.5 bg-background/55 px-6 text-center backdrop-blur-md',
+  gateTitle: 'mt-1 text-base font-bold text-foreground',
+  gateText: 'text-sm text-muted',
+  gateBtn:
+    'mt-3 rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90',
 
   cta: 'inline-flex items-center rounded-full bg-accent px-3 py-1.5 text-xs font-semibold text-surface transition-opacity hover:opacity-90',
   card: 'flex min-w-[240px] items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2.5',
@@ -211,91 +217,85 @@ export function ChatView({ recordedAt, onBack }: Props) {
   const lastMsg = messages[messages.length - 1];
   const suggestions =
     !sending && lastMsg && lastMsg.status === 'done' ? (lastMsg.suggestions ?? []) : [];
+  const gated = messages.some((m) => m.quota);
 
   return (
-    <div className={S.panel}>
-      <div className={S.head}>
-        <button type="button" onClick={onBack} className={S.back} aria-label="뒤로">
+    <div className={STYLES.panel}>
+      <div className={STYLES.head}>
+        <button type="button" onClick={onBack} className={STYLES.back} aria-label="뒤로">
           <ArrowLeft size={17} strokeWidth={2.1} />
         </button>
         {messages.length > 0 && (
-          <button type="button" className={S.clear} onClick={() => clear(recordedAt)}>
+          <button type="button" className={STYLES.clear} onClick={() => clear(recordedAt)}>
             기록 지우기
           </button>
         )}
       </div>
-
-      <div className={S.body}>
-        {messages.length === 0 ? (
-          <div className={S.hint}>
-            <AiMark size={38} className={cn('text-emerald-500 dark:text-emerald-400', GLOW)} />
-            <p className={S.hintTitle}>무엇을 드셨나요?</p>
-            <p className={S.hintText}>
-              먹은 것·운동을 말하듯 적으면 기록돼요.
-              <br />
-              수정·삭제도 말로 하면 됩니다.
-            </p>
-          </div>
-        ) : (
-          messages.map((m) => (
-            <div key={m.id} className={S.turn}>
-              <div className={S.userMsg}>{m.text}</div>
-
-              {m.status === 'pending' && (
-                <div className={S.gen}>
-                  <span className={S.genIcon}>
-                    <span className={S.genInner}>
-                      <AiMark size={19} />
-                    </span>
-                  </span>
-                  <span>생성 중이에요…</span>
-                </div>
-              )}
-
-              {m.status === 'done' && (
-                <div className={S.bot}>
-                  <span className={S.botMark}>
-                    <AiMark size={20} />
-                  </span>
-                  <div className={S.botContent}>
-                    {m.reply && <BotText text={m.reply} animate={freshIds.current.has(m.id)} />}
-                    {m.cards?.map((c, i) => (
-                      <RecCard key={i} card={c} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {m.status === 'error' && (
-                <div className={S.bot}>
-                  <span className={S.botMark}>
-                    <AiMark size={20} />
-                  </span>
-                  <div className="flex flex-col items-start gap-1.5">
-                    <p className={S.botError}>{m.error}</p>
-                    {m.quota && (
-                      <Link href="/signup" className={S.cta}>
-                        회원가입하고 계속하기 →
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className={STYLES.body}>
+          {messages.length === 0 ? (
+            <div className={STYLES.hint}>
+              <AiMark size={38} className={cn('text-emerald-500 dark:text-emerald-400', GLOW)} />
+              <p className={STYLES.hintTitle}>무엇을 드셨나요?</p>
+              <p className={STYLES.hintText}>
+                먹은 것·운동을 말하듯 적으면 기록돼요.
+                <br />
+                수정·삭제도 말로 하면 됩니다.
+              </p>
             </div>
-          ))
-        )}
-        <div ref={endRef} />
-      </div>
+          ) : (
+            messages.map((m) => (
+              <div key={m.id} className={STYLES.turn}>
+                <div className={STYLES.userMsg}>{m.text}</div>
 
+                {m.status === 'pending' && (
+                  <div className={STYLES.gen}>
+                    <span className={STYLES.genIcon}>
+                      <span className={STYLES.genInner}>
+                        <AiMark size={19} />
+                      </span>
+                    </span>
+                    <span>생성 중이에요…</span>
+                  </div>
+                )}
+
+                {m.status === 'done' && (
+                  <div className={STYLES.bot}>
+                    <span className={STYLES.botMark}>
+                      <AiMark size={20} />
+                    </span>
+                    <div className={STYLES.botContent}>
+                      {m.reply && <BotText text={m.reply} animate={freshIds.current.has(m.id)} />}
+                      {m.cards?.map((c, i) => (
+                        <RecCard key={i} card={c} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {m.status === 'error' && (
+                  <div className={STYLES.bot}>
+                    <span className={STYLES.botMark}>
+                      <AiMark size={20} />
+                    </span>
+                    <p className={STYLES.botError}>{m.error}</p>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          <div ref={endRef} />
+        </div>{' '}
+      </div>
       <div
-        className={S.dock}
+        className={STYLES.dock}
         style={{ background: 'linear-gradient(to top, var(--background) 56%, transparent)' }}
       >
         {suggestions.length > 0 && (
-          <div className={S.suggestWrap}>
+          <div className={STYLES.suggestWrap}>
             <button
               type="button"
-              className={S.suggestToggle}
+              className={STYLES.suggestToggle}
               onClick={() => setShowSuggest((v) => !v)}
               aria-expanded={showSuggest}
             >
@@ -303,16 +303,16 @@ export function ChatView({ recordedAt, onBack }: Props) {
             </button>
             <div
               className={cn(
-                S.suggestGrid,
+                STYLES.suggestGrid,
                 showSuggest ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
               )}
             >
-              <div className={S.suggestList}>
+              <div className={STYLES.suggestList}>
                 {suggestions.map((s, i) => (
                   <button
                     key={i}
                     type="button"
-                    className={S.sGhost}
+                    className={STYLES.sGhost}
                     style={{ animationDelay: `${i * 50}ms` }}
                     onClick={() => void send(s)}
                     disabled={sending}
@@ -325,10 +325,10 @@ export function ChatView({ recordedAt, onBack }: Props) {
           </div>
         )}
 
-        <div className={S.input}>
+        <div className={STYLES.input}>
           <textarea
             ref={taRef}
-            className={S.textarea}
+            className={STYLES.textarea}
             placeholder="예) 점심에 비빔밥 먹음"
             value={value}
             onChange={(e) => {
@@ -343,13 +343,35 @@ export function ChatView({ recordedAt, onBack }: Props) {
             type="button"
             onClick={() => void send()}
             disabled={sending || value.trim().length === 0}
-            className={S.send}
+            className={STYLES.send}
             aria-label="전송"
           >
             <Send size={16} strokeWidth={2.1} />
           </button>
         </div>
-      </div>
+      </div>{' '}
+      {gated && (
+        <div className={STYLES.gate}>
+          <AiMark size={44} className={cn('text-emerald-500 dark:text-emerald-400', GLOW)} />
+          <p className={STYLES.gateTitle}>게스트 체험이 끝났어요</p>
+          <p className={STYLES.gateText}>회원가입하면 이어서 기록할 수 있어요.</p>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await logout(); // 게스트 세션 정리 (토큰 충돌 방지)
+              } catch {
+                // API 다운 등 무시하고 진행
+              }
+              useChatStore.getState().reset();
+              window.location.href = '/signup'; // 하드 네비게이션 (확실히 이동)
+            }}
+            className={STYLES.gateBtn}
+          >
+            회원가입 하러 가기
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -358,33 +380,33 @@ function RecCard({ card }: { card: ChatCard }) {
   const removed = card.kind === 'removed';
   const Icon = card.type === 'DIET' ? Salad : Activity;
   return (
-    <div className={cn(S.card, removed && S.cardRemoved)}>
+    <div className={cn(STYLES.card, removed && STYLES.cardRemoved)}>
       <span
         className={cn(
-          S.cardIco,
+          STYLES.cardIco,
           removed ? 'bg-subtle text-muted' : RECORD_TYPE_META[card.type].badgeSoft,
         )}
       >
         {removed ? <Trash2 size={16} /> : <Icon size={17} />}
       </span>
-      <div className={S.cardMain}>
-        <div className={S.cardTop}>
-          <span className={removed ? S.cardNameDel : S.cardName}>{card.name}</span>
-          {!removed && card.meal && <span className={S.cardMeal}>{card.meal}</span>}
+      <div className={STYLES.cardMain}>
+        <div className={STYLES.cardTop}>
+          <span className={removed ? STYLES.cardNameDel : STYLES.cardName}>{card.name}</span>
+          {!removed && card.meal && <span className={STYLES.cardMeal}>{card.meal}</span>}
         </div>
-        <div className={S.cardSub}>
+        <div className={STYLES.cardSub}>
           <span className={removed ? undefined : 'font-semibold text-foreground'}>
             {card.detail}
           </span>
-          {!removed && card.estimated && <span className={S.badgeEst}>추정</span>}
+          {!removed && card.estimated && <span className={STYLES.badgeEst}>추정</span>}
         </div>
       </div>
-      {removed && <span className={S.tagDel}>삭제</span>}
+      {removed && <span className={STYLES.tagDel}>삭제</span>}
     </div>
   );
 }
 
 function BotText({ text, animate }: { text: string; animate: boolean }) {
   const shown = useTypewriter(text, animate);
-  return <p className={S.botText}>{shown}</p>;
+  return <p className={STYLES.botText}>{shown}</p>;
 }

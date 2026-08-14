@@ -92,7 +92,26 @@ export function SignupForm() {
           autoComplete="nickname"
           error={errors.nickname?.message}
           {...register('nickname')}
-        />
+        />{' '}
+        <div className="flex items-start gap-2">
+          <input
+            id="agree"
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--accent)]"
+            {...register('agree')}
+          />
+          <label htmlFor="agree" className="text-xs leading-relaxed text-muted">
+            <Link href="/terms" target="_blank" className={STYLES.link}>
+              이용약관
+            </Link>{' '}
+            및{' '}
+            <Link href="/privacy" target="_blank" className={STYLES.link}>
+              개인정보처리방침
+            </Link>
+            에 동의합니다. <span className="text-danger">(필수)</span>
+          </label>
+        </div>
+        {errors.agree && <p className="text-xs text-danger">{errors.agree.message}</p>}
         <Button type="submit" fullWidth disabled={isSubmitting}>
           {isSubmitting ? '가입 중…' : '회원가입'}
         </Button>

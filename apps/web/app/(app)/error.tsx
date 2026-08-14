@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { CircleAlert, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
-const S = {
+const STYLES = {
   wrap: 'flex min-h-[50vh] flex-col items-center justify-center gap-5 text-center',
   icon: 'flex h-12 w-12 items-center justify-center rounded-full bg-danger/10 text-danger',
   body: 'flex flex-col gap-2',
@@ -29,29 +29,29 @@ export default function AppError({
   }, [error]);
 
   return (
-    <div className={S.wrap}>
-      <span className={S.icon}>
+    <div className={STYLES.wrap}>
+      <span className={STYLES.icon}>
         <CircleAlert size={24} strokeWidth={2} aria-hidden />
       </span>
 
-      <div className={S.body}>
-        <h2 className={S.title}>데이터를 불러오지 못했어요</h2>
-        <p className={S.desc}>
+      <div className={STYLES.body}>
+        <h2 className={STYLES.title}>데이터를 불러오지 못했어요</h2>
+        <p className={STYLES.desc}>
           일시적인 문제일 수 있어요. 다시 시도해도 안 되면 잠시 후 다시 들어와 주세요.
         </p>
       </div>
 
-      <div className={S.actions}>
+      <div className={STYLES.actions}>
         <Button variant="primary" onClick={reset}>
           <RotateCw size={16} aria-hidden />
           다시 시도
         </Button>
-        <Link href="/dashboard" className={S.link}>
+        <Link href="/dashboard" className={STYLES.link}>
           대시보드로
         </Link>
       </div>
 
-      {error.digest && <p className={S.digest}>오류 코드: {error.digest}</p>}
+      {error.digest && <p className={STYLES.digest}>오류 코드: {error.digest}</p>}
     </div>
   );
 }
