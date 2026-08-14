@@ -43,7 +43,7 @@ export function signup(input: {
 }): Promise<AuthResult> {
   return request<AuthResult>('/api/auth/signup', {
     method: 'POST',
-    headers: { 'Content-Type': '/application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
 }
