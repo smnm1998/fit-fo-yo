@@ -45,21 +45,22 @@ AI가 알아서 칼로리로 정리하고 하루 단위로 조언을 줍니다.
 
 ## 🏗️ 시스템 아키텍처
 
-TurboRepo 모노레포 · **BFF 패턴** — 프론트가 DB에 직접 접근하지 않고, 데이터를 정제해 API로만 통신합니다.
+TurboRepo 모노레포 · **BFF 패턴** — 프론트엔드는 DB에 직접 접근하지 않습니다. BFF 계층이 데이터를 정제(집계·DTO 변환)하고, **인증 토큰을 `HttpOnly` 쿠키로 관리**해 토큰을 클라이언트에 노출하지 않은 채 API와 통신합니다.
 
 ```mermaid
 flowchart LR
-    U([👤 사용자]) --> Client
+    U([👤 사용자])
 
-    subgraph Web ["apps/web (Next.js)"]
+    subgraph Web ["apps/web · Next.js (Vercel)"]
         Client["Client Components<br/>(UI / 인터랙션)"]
-        BFF["BFF Layer<br/>(Server Components · Route Handlers)"]
+        BFF["BFF Layer<br/>(Server Components · Route Handlers · Middleware)"]
         Client -->|데이터 요청| BFF
     end
 
-    BFF -->|데이터 집계 · DTO 변환 · 프록시| API["apps/api (NestJS)"]
-    API --> DB[("PostgreSQL (Neon)")]
-    API --> OA(["OpenAI (Function Calling)"])
+    U --> Client
+    BFF -->|집계 · DTO 변환 · 인증 토큰 부착| API["apps/api · NestJS (Railway)"]
+    API -->|Prisma| DB[("PostgreSQL · Neon")]
+    API --> OA(["OpenAI · Function Calling"])
 ```
 
 | 패키지                  | 역할                                                                                                                           |
