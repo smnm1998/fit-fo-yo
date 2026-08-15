@@ -49,10 +49,17 @@ TurboRepo 모노레포 · **BFF 패턴** — 프론트가 DB에 직접 접근하
 
 ```mermaid
 flowchart LR
-  U([👤 사용자]) --> Web["apps/web<br/>Next.js · BFF"]
-  Web -->|프록시 · 집계| API["apps/api<br/>NestJS"]
-  API --> DB[("PostgreSQL<br/>Neon")]
-  API --> OA(["OpenAI<br/>Function Calling"])
+    U([👤 사용자]) --> Client
+
+    subgraph Web ["apps/web (Next.js)"]
+        Client["Client Components<br/>(UI / 인터랙션)"]
+        BFF["BFF Layer<br/>(Server Components · Route Handlers)"]
+        Client -->|데이터 요청| BFF
+    end
+
+    BFF -->|데이터 집계 · DTO 변환 · 프록시| API["apps/api (NestJS)"]
+    API --> DB[("PostgreSQL (Neon)")]
+    API --> OA(["OpenAI (Function Calling)"])
 ```
 
 | 패키지                  | 역할                                                                                                                           |
