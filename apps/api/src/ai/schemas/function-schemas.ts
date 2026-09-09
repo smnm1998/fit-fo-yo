@@ -28,6 +28,12 @@ const dietItemSchema = {
       description:
         '총 칼로리. 반드시 round(caloriesPer100g × gramsEstimate / 100) 과 일치해야 합니다.',
     },
+    caloriesBurned: {
+      type: 'integer',
+      description:
+        '소모 칼로리. round(met × 3.5 × 65 / 200 × durationMinutes) 로 채우세요. ' +
+        '서버가 사용자 실제 체중으로 다시 계산하므로 met 와 durationMinutes 가 더 중요합니다.',
+    },
     carbs: { type: 'number', description: '탄수화물 (g)' },
     protein: { type: 'number', description: '단백질 (g)' },
     fat: { type: 'number', description: '지방 (g)' },

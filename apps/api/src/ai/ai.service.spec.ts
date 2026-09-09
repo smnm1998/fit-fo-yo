@@ -6,6 +6,7 @@ import { OpenAIClient } from './openai.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { NutritionService } from '../nutrition/nutrition.service';
+import { HealthProfileService } from '../health-profile/health-profile.service';
 
 /** OpenAI chat.completions tool_call 응답을 흉내내는 헬퍼 */
 function toolCallResponse(name: string, args: unknown) {
@@ -25,12 +26,14 @@ describe('AiService', () => {
   let openai: { chatWithTools: jest.Mock };
   let records: { createFromParsed: jest.Mock };
   let nutrition: { lookupMany: jest.Mock };
+  let healthProfile: { get: jest.Mock };
 
   beforeEach(async () => {
     openai = { chatWithTools: jest.fn() };
     records = { createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })) };
     // 기본: 시드 미등록(빈 Map) → LLM 재계산 폴백. 등록 케이스는 테스트마다 override.
     nutrition = { lookupMany: jest.fn().mockResolvedValue(new Map()) };
+    healthProfile = { get: jest.fn().mockResolvedValue(null) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -42,10 +45,58 @@ describe('AiService', () => {
           provide: PrismaService,
           useValue: { user: { findUnique: jest.fn(), update: jest.fn() } },
         },
+        { provide: HealthProfileService, useValue: healthProfile },
       ],
     }).compile();
 
     service = moduleRef.get(AiService);
+  });
+
+  describe('운동 소모 칼로리 - 체중 반영', () => {
+    function joggingCall() {
+      return toolCallResponse('record_exercise', {
+        items: [
+          { name: '조깅', durationMinutes: 30, met: 7, caloriesBurned: 9999, estimated: true },
+        ],
+      });
+    }
+
+    function savedCaloriesBurned(): number | undefined {
+      const arg = records.createFromParsed.mock.calls[0]?.[0] as {
+        exerciseItems: { caloriesBurned?: number };
+      };
+      return arg.exerciseItems[0]?.caloriesBurned;
+    }
+
+    it('프로필 체중이 있으면 그 체중으로 계산한다.', async () => {
+      healthProfile.get.mockResolvedValue({ weightKg: 70 });
+      openai.chatWithTools.mockResolvedValue(joggingCall());
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '30분 조깅' });
+
+      expect(savedCaloriesBurned()).toBe(257);
+    });
+
+    it('프로필이 없으면 기본 체중 65kg으로 게산한다.', async () => {
+      healthProfile.get.mockResolvedValue(null);
+      openai.chatWithTools.mockResolvedValue(joggingCall());
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '30분 조깅' });
+
+      expect(savedCaloriesBurned()).toBe(239);
+    });
+
+    it('식단만 있으면 프로필을 조회하지 않는다', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [{ name: '비빔밥', calories: 600, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '비빔밥' });
+
+      expect(healthProfile.get).not.toHaveBeenCalled();
+    });
   });
 
   describe('parse', () => {
