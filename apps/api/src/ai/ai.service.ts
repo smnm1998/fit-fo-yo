@@ -24,6 +24,7 @@ import { NutritionService, normalizeFoodName } from '../nutrition/nutrition.serv
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { CHAT_AGENT_SYSTEM_PROMPT } from './prompts/chat-agent.system';
 import { UpdateRecordDto } from '../records/dto/update-record.dto';
+import { HealthProfileService } from '../health-profile/health-profile.service';
 
 /** 체중 미상 사용자 기본값. HealthProfile 연동 시 대체 예정. */
 const DEFAULT_WEIGHT_KG = 65;
@@ -40,6 +41,7 @@ export class AiService {
     private readonly records: RecordsService,
     private readonly nutrition: NutritionService,
     private readonly prisma: PrismaService,
+    private readonly healthProfile: HealthProfileService,
   ) {}
 
   /**
@@ -113,6 +115,10 @@ export class AiService {
       });
     }
 
+    const weightKg = valid.some((r) => r.kind === 'exercise')
+      ? await this.loadWeightKg(params.userId)
+      : DEFAULT_WEIGHT_KG;
+
     return Promise.all(
       valid.map((parsed) => {
         const recordedAt = this.resolveRecordedAt(
@@ -121,7 +127,13 @@ export class AiService {
         );
         return parsed.kind === 'diet'
           ? this.createDiet(params.userId, parsed.payload, recordedAt, params.rawInput)
-          : this.createExercise(params.userId, parsed.payload, recordedAt, params.rawInput);
+          : this.createExercise(
+              params.userId,
+              parsed.payload,
+              recordedAt,
+              params.rawInput,
+              weightKg,
+            );
       }),
     );
   }
@@ -169,12 +181,12 @@ export class AiService {
     };
   }
 
-  private toExerciseItemInput(item: ParsedExercisePayload['items'][number]) {
+  private toExerciseItemInput(item: ParsedExercisePayload['items'][number], weightKg: number) {
     return {
       name: item.name,
       durationMinutes: item.durationMinutes,
       intensity: item.intensity,
-      caloriesBurned: this.resolveCaloriesBurned(item),
+      caloriesBurned: this.resolveCaloriesBurned(item, weightKg),
       estimated: item.estimated,
     };
   }
@@ -201,6 +213,7 @@ export class AiService {
     payload: ParsedExercisePayload,
     recordedAt: Date,
     rawInput: string,
+    weightKg: number,
   ) {
     return this.records.createFromParsed({
       userId,
@@ -208,7 +221,7 @@ export class AiService {
       rawInput,
       parsedJson: payload as unknown as Prisma.InputJsonValue,
       recordedAt,
-      exerciseItems: payload.items.map((item) => this.toExerciseItemInput(item)),
+      exerciseItems: payload.items.map((item) => this.toExerciseItemInput(item, weightKg)),
     });
   }
 
@@ -220,7 +233,10 @@ export class AiService {
       dto.dietItems = payload.dietItems.map((item) => this.toDietItemInput(item, table));
     }
     if (payload.exerciseItems) {
-      dto.exerciseItems = payload.exerciseItems.map((item) => this.toExerciseItemInput(item));
+      const weightKg = await this.loadWeightKg(userId);
+      dto.exerciseItems = payload.exerciseItems.map((item) =>
+        this.toExerciseItemInput(item, weightKg),
+      );
     }
     return this.records.update(userId, payload.recordId, dto);
   }
@@ -298,12 +314,21 @@ export class AiService {
     return item.calories;
   }
 
+  private async loadWeightKg(userId: string): Promise<number> {
+    const profile = await this.healthProfile.get(userId);
+    const weight = profile?.weightKg;
+    return typeof weight === 'number' && weight > 0 ? weight : DEFAULT_WEIGHT_KG;
+  }
+
   /** 소모 칼로리 = MET × 3.5 × 체중(kg) / 200 × 분 */
-  private resolveCaloriesBurned(item: {
-    met?: number;
-    durationMinutes?: number;
-    caloriesBurned?: number;
-  }): number | undefined {
+  private resolveCaloriesBurned(
+    item: {
+      met?: number;
+      durationMinutes?: number;
+      caloriesBurned?: number;
+    },
+    weightKg: number,
+  ): number | undefined {
     const { met, durationMinutes } = item;
     if (
       typeof met === 'number' &&
@@ -311,7 +336,7 @@ export class AiService {
       met > 0 &&
       durationMinutes > 0
     ) {
-      return Math.round(((met * 3.5 * DEFAULT_WEIGHT_KG) / 200) * durationMinutes);
+      return Math.round(((met * 3.5 * weightKg) / 200) * durationMinutes);
     }
     return item.caloriesBurned;
   }
@@ -369,6 +394,10 @@ export class AiService {
     };
     const toolResults: ChatCompletionMessageParam[] = [];
 
+    // 운동 관련 툴이 나올 때만, 그리고 한 턴에 한 번만 조회
+    let cachedWeight: number | null = null;
+    const weight = async (): Promise<number> => (cachedWeight ??= await this.loadWeightKg(userId));
+
     for (const call of functionCalls) {
       const args = this.safeParseJson(call.function.arguments);
       let summary: string;
@@ -393,6 +422,7 @@ export class AiService {
               payload,
               this.resolveRecordedAt(payload.recordedAt, recordedAt),
               lastUser,
+              await weight(),
             );
             mutations.created.push(rec);
             summary = `운동 등록 완료 (id=${rec.id})`;

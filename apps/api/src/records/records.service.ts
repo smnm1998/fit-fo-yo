@@ -81,15 +81,18 @@ export class RecordsService {
         : {}),
     };
 
-    const items = await this.prisma.record.findMany({
-      where,
-      orderBy: { recordedAt: 'desc' },
-      take: query.limit,
-      skip: query.offset,
-      include: { dietItems: true, exerciseItems: true },
-    });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.record.findMany({
+        where,
+        orderBy: { recordedAt: 'desc' },
+        take: query.limit,
+        skip: query.offset,
+        include: { dietItems: true, exerciseItems: true },
+      }),
+      this.prisma.record.count({ where }),
+    ]);
 
-    return { items, total: items.length, limit: query.limit, offset: query.offset };
+    return { items, total, limit: query.limit, offset: query.offset };
   }
 
   async findOne(userId: string, id: string) {

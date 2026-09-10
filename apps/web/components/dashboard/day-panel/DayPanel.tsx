@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { DayTotals } from '@/lib/records';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 import { DashboardView } from './DashboardView';
-import { ChatView } from './ChatView';
+import { ChatView } from './chat/ChatView';
 
 type Props = {
   dateLabelText: string;
@@ -26,13 +26,7 @@ export function DayPanel({
   const [mode, setMode] = useState<'dashboard' | 'input'>('dashboard');
 
   if (mode === 'input') {
-    return (
-      <ChatView
-        dateLabelText={dateLabelText}
-        recordedAt={recordedAt}
-        onBack={() => setMode('dashboard')}
-      />
-    );
+    return <ChatView recordedAt={recordedAt} onBack={() => setMode('dashboard')} />;
   }
 
   return (
