@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { AiChatTurn } from '@/lib/types';
-import { aiChat, ApiError, updateRecord } from '@/lib/client/records-api';
+import { aiChat, ApiError } from '@/lib/client/records-api';
 import { useRecordsStore } from '@/lib/store/records-store';
 import { useChatStore, type ChatCard, type ChatMsg } from '@/lib/store/chat-store';
 import { dtoToCard, removedCard } from './chat-card';
