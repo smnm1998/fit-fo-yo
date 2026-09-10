@@ -52,6 +52,51 @@ describe('AiService', () => {
     service = moduleRef.get(AiService);
   });
 
+  describe('날짜 컨텍스트', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date('2026-09-12T01:00:00.000Z') });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function systemPrompt(): string {
+      const arg = openai.chatWithTools.mock.calls[0]?.[0] as { system: string };
+      return arg.system;
+    }
+
+    it('오늘 보고 있는 날짜를 KST로 시스템 프롬프트에 싣는다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_exercise', {
+          items: [{ name: '조깅', durationMinutes: 30, met: 7, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({
+        userId: 'u1',
+        rawInput: '어제 30분 조깅',
+        fallbackRecordedAt: '2026-09-10T03:00:00.000Z',
+      });
+
+      expect(systemPrompt()).toContain('오늘 (KST): 2026-09-12 (토)');
+      expect(systemPrompt()).toContain('보고 있는 날짜: 2026-09-10 (목)');
+    });
+
+    it('선택 날짜가 없으면 보고 있는 날짜도 오늘로 채운다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [{ name: '비빔밥', calories: 600, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '비빔밥' });
+
+      expect(systemPrompt()).toContain('오늘 (KST): 2026-09-12 (토)');
+      expect(systemPrompt()).toContain('보고 있는 날짜: 2026-09-12 (토)');
+    });
+  });
+
   describe('운동 소모 칼로리 - 체중 반영', () => {
     function joggingCall() {
       return toolCallResponse('record_exercise', {

@@ -48,9 +48,9 @@ export class AiService {
    * 순수 파싱 — LLM 호출 + tool_call 분류만. 저장 없음.
    * 병렬 tool call 지원: 식단+운동이 함께 오면 결과가 2개.
    */
-  async parse(rawInput: string): Promise<ParsedResult[]> {
+  async parse(rawInput: string, recordedAt?: string): Promise<ParsedResult[]> {
     const response = await this.openai.chatWithTools({
-      system: PARSE_RECORD_SYSTEM_PROMPT,
+      system: `${PARSE_RECORD_SYSTEM_PROMPT}\n\n${this.buildDateContext(recordedAt)}`,
       user: rawInput,
       tools: PARSE_RECORD_TOOLS,
       toolChoice: 'required',
@@ -98,7 +98,7 @@ export class AiService {
     fallbackRecordedAt?: string;
   }) {
     await this.assertGuestQuota({ id: params.userId, isGuest: params.isGuest });
-    const results = await this.parse(params.rawInput);
+    const results = await this.parse(params.rawInput, params.fallbackRecordedAt);
     await this.bumpGuestUsage({ id: params.userId, isGuest: params.isGuest });
     const valid = results.filter(
       (r): r is Extract<ParsedResult, { kind: 'diet' | 'exercise' }> => r.kind !== 'invalid_domain',
@@ -368,7 +368,11 @@ export class AiService {
       limit: 50,
       offset: 0,
     });
-    const systemContent = `${CHAT_AGENT_SYSTEM_PROMPT}\n\n${this.buildDayContext(dayRecords)}`;
+    const systemContent = [
+      CHAT_AGENT_SYSTEM_PROMPT,
+      this.buildDateContext(recordedAt),
+      this.buildDayContext(dayRecords),
+    ].join('\n\n');
     const historyParams: ChatCompletionMessageParam[] = history.map((m) => ({
       role: m.role,
       content: m.content,
@@ -494,6 +498,39 @@ export class AiService {
     } catch {
       return fallback;
     }
+  }
+
+  /**
+   * KST 기준 'YYYY-MM-DD (요일)'
+   * dayRange와 같은 방식(UTC에 +9h)으로 계산해 두 곳의 날짜 해석이 어긋나지 않게 한다.
+   */
+  private kstDateLabel(date: Date): string {
+    const KST = 9 * 60 * 60 * 1000;
+    const k = new Date(date.getTime() + KST);
+    const y = k.getUTCFullYear();
+    const m = String(k.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(k.getUTCDate()).padStart(2, '0');
+    const dow = ['일', '월', '화', '수', '목', '금', '토'][k.getUTCDay()];
+    return `${y}-${m}-${d} (${dow})`;
+  }
+
+  /**
+   * 모델에게 기준일을 줌
+   * 이게 없으면 "어제"를 계산할 근거가 없어 recordedAt을 생략하고,
+   * 결국 사용자가 보고 있던 날짜에 저장됨
+   */
+  private buildDateContext(recordedAt?: string): string {
+    const now = new Date();
+    return [
+      `오늘 (KST): ${this.kstDateLabel(now)}`,
+      `사용자가 캘린더에서 보고 있는 날짜: ${this.kstDateLabel(recordedAt ? new Date(recordedAt) : now)}`,
+      '',
+      '날짜 규칙:',
+      '- 날짜 언급이 없으면 recordedAt 을 생략하세요. 서버가 "보고 있는 날짜" 로 저장합니다.',
+      '- "어제 · 그저께 · 지난 화요일" 처럼 상대 표현이 나오면 위 "오늘 (KST)" 를 기준으로',
+      '  계산해 recordedAt 을 ISO8601 로 채우세요.',
+      '- 시각이 명시되지 않았으면 그 날 12:00 (KST) = 03:00Z 로 잡으세요.',
+    ].join('\n');
   }
 
   private dayRange(recordedAt?: string): { from: Date; to: Date } {
