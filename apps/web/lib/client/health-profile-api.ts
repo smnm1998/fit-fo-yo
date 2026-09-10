@@ -1,5 +1,5 @@
 import { request } from './auth-api';
-import type { HealthProfileDto } from '../types';
+import type { HealthProfileDto } from '@/lib/types';
 
 export type HealthProfileInput = {
   heightCm?: number;

@@ -1,5 +1,5 @@
 import { request } from '@/lib/client/auth-api';
-import type { RecordDto, RecommendationDto } from './../types';
+import type { RecordDto, RecommendationDto } from '@/lib/types';
 
 export type MonthData = { records: RecordDto[]; recommendations: RecommendationDto[] };
 
