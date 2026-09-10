@@ -1,9 +1,9 @@
 import { Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/guards/jwt-access.guard';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { RecommendationService } from './recommendation.service';
 import { RecommendationCron } from './recommendation.cron';
 import { Throttle } from '@nestjs/throttler';
-import { type AuthenticatedUser, CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { type AuthenticatedUser, CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @UseGuards(JwtAccessGuard)
 @Controller('recommendations')
