@@ -16,7 +16,7 @@
       "outputs": []
     },
     "check-types": {
-      "dependsOn": ["^check-types", "^db:generate"]
+      "dependsOn": ["^check-types", "^build", "^db:generate"]
     },
     "dev": {
       "cache": false,
