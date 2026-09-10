@@ -47,6 +47,7 @@ describe('RecordsService.findAll', () => {
 
     const listArgs = prisma.record.findMany.mock.calls[0]?.[0] as { where: unknown };
     const countArgs = prisma.record.count.mock.calls[0]?.[0] as { where: unknown };
+    expect(countArgs.where).toEqual(listArgs.where);
   });
 
   it('목록과 개수를 한 트랜잭션으로 묶는다.', async () => {
