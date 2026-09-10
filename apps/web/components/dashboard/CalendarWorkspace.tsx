@@ -17,6 +17,7 @@ import { CalendarGrid } from '@/components/calendar/CalendarGrid';
 import { DayPanel } from '@/components/dashboard/day-panel/DayPanel';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 import { fetchMonthData } from '@/lib/client/month-api';
+import { useDelayedFlag } from '@/lib/hooks/useDelayedFlag';
 
 const STYLES = {
   toolbar: 'flex items-center gap-2',
@@ -157,7 +158,9 @@ export function CalendarWorkspace({
   );
   const totals = sumRecords(dayRecords);
 
-  const calendar = loading ? (
+  const showSkeleton = useDelayedFlag(loading);
+
+  const calendar = showSkeleton ? (
     <div className={STYLES.skeleton} />
   ) : (
     <CalendarGrid month={month} records={monthRecords} selectedDate={date} onSelect={selectDate} />
