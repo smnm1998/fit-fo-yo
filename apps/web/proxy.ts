@@ -99,7 +99,6 @@ export const config = {
     '/record/:path*',
 
     '/api/records/:path*',
-    '/api/recommendations/:path*',
     '/api/health-profile/:path*',
     '/api/ai/:path*',
   ],
