@@ -10,6 +10,11 @@ export type AuthTokens = {
   refreshToken: string;
 };
 
+export type AuthResponse = {
+  user: ApiUser;
+  tokens: AuthTokens;
+};
+
 export type DietItem = {
   id: string;
   name: string;
