@@ -19,15 +19,12 @@ import {
   type UpdateRecordPayload,
   type DeleteRecordPayload,
 } from './schemas/function-schemas';
-import type { FoodNutrition } from '@fitfoyo/database';
-import { NutritionService, normalizeFoodName } from '../nutrition/nutrition.service';
+import { NutritionService } from '../nutrition/nutrition.service';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
 import { CHAT_AGENT_SYSTEM_PROMPT } from './prompts/chat-agent.system';
 import { UpdateRecordDto } from '../records/dto/update-record.dto';
 import { HealthProfileService } from '../health-profile/health-profile.service';
-
-/** 체중 미상 사용자 기본값. HealthProfile 연동 시 대체 예정. */
-const DEFAULT_WEIGHT_KG = 65;
+import { DEFAULT_WEIGHT_KG, toDietItemInput, toExerciseItemInput } from './calorie.calculator';
 
 /** 게스트 AI 사용 상한 (체험용). 초과 시 회원가입 유도. */
 const GUEST_AI_LIMIT = 10;
@@ -161,36 +158,6 @@ export class AiService {
     });
   }
 
-  // ───────── 생성/수정 공용 헬퍼 (parse-and-save & chat) ─────────
-  private toDietItemInput(
-    item: ParsedDietPayload['items'][number],
-    table: Map<string, FoodNutrition>,
-  ) {
-    const grounded = this.groundCalories(item, table);
-    return {
-      name: item.name,
-      mealType: item.mealType || undefined,
-      quantity: item.quantity,
-      unit: item.unit,
-      grams: grounded.grams,
-      calories: grounded.calories,
-      carbs: item.carbs,
-      protein: item.protein,
-      fat: item.fat,
-      estimated: grounded.estimated,
-    };
-  }
-
-  private toExerciseItemInput(item: ParsedExercisePayload['items'][number], weightKg: number) {
-    return {
-      name: item.name,
-      durationMinutes: item.durationMinutes,
-      intensity: item.intensity,
-      caloriesBurned: this.resolveCaloriesBurned(item, weightKg),
-      estimated: item.estimated,
-    };
-  }
-
   private async createDiet(
     userId: string,
     payload: ParsedDietPayload,
@@ -204,7 +171,7 @@ export class AiService {
       rawInput,
       parsedJson: payload as unknown as Prisma.InputJsonValue,
       recordedAt,
-      dietItems: payload.items.map((item) => this.toDietItemInput(item, table)),
+      dietItems: payload.items.map((item) => toDietItemInput(item, table)),
     });
   }
 
@@ -221,23 +188,23 @@ export class AiService {
       rawInput,
       parsedJson: payload as unknown as Prisma.InputJsonValue,
       recordedAt,
-      exerciseItems: payload.items.map((item) => this.toExerciseItemInput(item, weightKg)),
+      exerciseItems: payload.items.map((item) => toExerciseItemInput(item, weightKg)),
     });
   }
 
   private async updateRecord(userId: string, payload: UpdateRecordPayload) {
     const dto: UpdateRecordDto = {};
+
     if (payload.recordedAt) dto.recordedAt = payload.recordedAt;
     if (payload.dietItems) {
       const table = await this.nutrition.lookupMany(payload.dietItems.map((i) => i.name));
-      dto.dietItems = payload.dietItems.map((item) => this.toDietItemInput(item, table));
+      dto.dietItems = payload.dietItems.map((item) => toDietItemInput(item, table));
     }
     if (payload.exerciseItems) {
       const weightKg = await this.loadWeightKg(userId);
-      dto.exerciseItems = payload.exerciseItems.map((item) =>
-        this.toExerciseItemInput(item, weightKg),
-      );
+      dto.exerciseItems = payload.exerciseItems.map((item) => toExerciseItemInput(item, weightKg));
     }
+
     return this.records.update(userId, payload.recordId, dto);
   }
 
@@ -249,96 +216,10 @@ export class AiService {
     }
   }
 
-  /**
-   * 등록 음식이면 DB 근거값으로 확정(estimated=false), 미등록이면 LLM 재계산 폴백.
-   */
-  private groundCalories(
-    item: {
-      name: string;
-      unit?: string;
-      quantity?: number;
-      gramsEstimate?: number;
-      caloriesPer100g?: number;
-      calories?: number;
-      estimated: boolean;
-    },
-    table: Map<string, FoodNutrition>,
-  ): { calories?: number; grams?: number; estimated: boolean } {
-    const hit = table.get(normalizeFoodName(item.name));
-    if (hit) {
-      const grams = this.resolveGrams(item, hit.gramsPerServing);
-      return {
-        calories: Math.round((hit.caloriesPer100g * grams) / 100),
-        grams: Math.round(grams),
-        estimated: false,
-      };
-    }
-    const grams =
-      typeof item.gramsEstimate === 'number' && item.gramsEstimate > 0
-        ? Math.round(item.gramsEstimate)
-        : undefined;
-    return { calories: this.resolveCalories(item), grams, estimated: item.estimated };
-  }
-
-  /** g/ml 로 무게를 직접 준 경우만 LLM grams 신뢰, 아니면 DB 대표 그램수 × 수량 */
-  private resolveGrams(
-    item: { unit?: string; quantity?: number; gramsEstimate?: number },
-    gramsPerServing: number,
-  ): number {
-    const { unit, quantity, gramsEstimate } = item;
-    if ((unit === 'g' || unit === 'ml') && typeof gramsEstimate === 'number' && gramsEstimate > 0) {
-      return gramsEstimate;
-    }
-    const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-    return qty * gramsPerServing;
-  }
-
-  /**
-   * 칼로리는 LLM 산수를 신뢰하지 않고 서버에서 재계산한다.
-   * 근거값(100g당 kcal, 환산 그램)이 없으면 LLM 값으로 폴백.
-   */
-  private resolveCalories(item: {
-    caloriesPer100g?: number;
-    gramsEstimate?: number;
-    calories?: number;
-  }): number | undefined {
-    const { caloriesPer100g, gramsEstimate } = item;
-    if (
-      typeof caloriesPer100g === 'number' &&
-      typeof gramsEstimate === 'number' &&
-      caloriesPer100g >= 0 &&
-      gramsEstimate > 0
-    ) {
-      return Math.round((caloriesPer100g * gramsEstimate) / 100);
-    }
-    return item.calories;
-  }
-
   private async loadWeightKg(userId: string): Promise<number> {
     const profile = await this.healthProfile.get(userId);
     const weight = profile?.weightKg;
     return typeof weight === 'number' && weight > 0 ? weight : DEFAULT_WEIGHT_KG;
-  }
-
-  /** 소모 칼로리 = MET × 3.5 × 체중(kg) / 200 × 분 */
-  private resolveCaloriesBurned(
-    item: {
-      met?: number;
-      durationMinutes?: number;
-      caloriesBurned?: number;
-    },
-    weightKg: number,
-  ): number | undefined {
-    const { met, durationMinutes } = item;
-    if (
-      typeof met === 'number' &&
-      typeof durationMinutes === 'number' &&
-      met > 0 &&
-      durationMinutes > 0
-    ) {
-      return Math.round(((met * 3.5 * weightKg) / 200) * durationMinutes);
-    }
-    return item.caloriesBurned;
   }
 
   private resolveRecordedAt(fromAi: string | undefined, fallback: string | undefined): Date {
