@@ -1,17 +1,26 @@
-import { apiFetch } from '@/lib/server/api';
+import { apiFetch, proxyJson, upstreamDown } from '@/lib/server/api';
 import { setAuthCookies } from '@/lib/server/auth-cookies';
+import type { AuthResponse } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const res = await apiFetch('/auth/signup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) return NextResponse.json(data, { status: res.status });
 
-  await setAuthCookies(data.tokens);
-  return NextResponse.json({ user: data.user }, { status: 201 });
+  let res: Response;
+  try {
+    res = await apiFetch('/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    return upstreamDown(error, '/auth/signup');
+  }
+
+  const { ok, data, response } = await proxyJson(res);
+  if (!ok) return response;
+
+  const { user, tokens } = data as AuthResponse;
+  await setAuthCookies(tokens);
+  return NextResponse.json({ user }, { status: 201 });
 }
