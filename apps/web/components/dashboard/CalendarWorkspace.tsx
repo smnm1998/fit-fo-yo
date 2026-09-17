@@ -18,6 +18,7 @@ import { DayPanel } from '@/components/dashboard/day-panel/DayPanel';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 import { fetchMonthData } from '@/lib/client/month-api';
 import { useDelayedFlag } from '@/lib/hooks/useDelayedFlag';
+import { useMoveRecord } from '@/lib/hooks/useMoveRecord';
 
 const STYLES = {
   toolbar: 'flex items-center gap-2',
@@ -51,6 +52,7 @@ export function CalendarWorkspace({
   const [loading, setLoading] = useState(false);
 
   const records = useRecordsStore((s) => s.records);
+  const moveRecord = useMoveRecord();
   const setRecords = useRecordsStore((s) => s.setRecords);
 
   // 월별 스냅샷 캐시 (재방문/인접 이동 즉시) + 레이스 가드용 현재 월 ref
@@ -163,7 +165,13 @@ export function CalendarWorkspace({
   const calendar = showSkeleton ? (
     <div className={STYLES.skeleton} />
   ) : (
-    <CalendarGrid month={month} records={monthRecords} selectedDate={date} onSelect={selectDate} />
+    <CalendarGrid
+      month={month}
+      records={monthRecords}
+      selectedDate={date}
+      onSelect={selectDate}
+      onMoveRecord={(record, toDay) => void moveRecord(record, toDay)}
+    />
   );
 
   return (

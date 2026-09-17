@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import { dateLabel, dayNoonIsoKST } from '@/lib/date';
 import { ManualRecordForm } from '@/components/calendar/ManualRecordForm';
 import { RecordChip } from './RecordChip';
+import type { ChipDragBindings } from './useRecordDrag';
 import type { RecordDto } from '@/lib/types';
 import { POPOVER_SURFACE } from '@/components/ui/surface';
 
@@ -17,6 +18,7 @@ const STYLES = {
   filler: 'relative flex min-h-[6.5rem] flex-col gap-1 bg-surface p-1.5 text-muted/40',
   addTrigger: 'absolute inset-0 transition-colors hover:bg-subtle',
   inner: 'pointer-events-none relative z-10 flex flex-col gap-1',
+  dropRing: 'pointer-events-none absolute inset-0 z-20 ring-2 ring-inset ring-accent',
   num: 'flex h-6 w-6 items-center justify-center rounded-full text-xs',
   numToday: 'font-semibold text-foreground',
   numSelected: 'bg-accent font-semibold text-surface',
@@ -28,12 +30,14 @@ const STYLES = {
 
 type DayCellProps = {
   date: string;
-  weekday: number; // 0=일 … 6=토
+  weekday: number;
   inMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
+  isDropTarget: boolean;
   records: RecordDto[];
   onSelect: (date: string) => void;
+  chipDrag?: ChipDragBindings;
 };
 
 export function DayCell({
@@ -42,13 +46,14 @@ export function DayCell({
   inMonth,
   isToday,
   isSelected,
+  isDropTarget,
   records,
   onSelect,
+  chipDrag,
 }: DayCellProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   const day = Number(date.slice(8, 10));
-  // 오른쪽 2개 열(금·토)은 왼쪽으로 열어 우측 DayPanel 가림 방지
   const popoverSide = weekday >= 5 ? 'left' : 'right';
 
   if (!inMonth) {
@@ -63,8 +68,7 @@ export function DayCell({
   const extra = records.length - shown.length;
 
   return (
-    <div className={cn(STYLES.cell, isToday && STYLES.today)}>
-      {/* 빈 칸/숫자 클릭 → 등록 팝오버 */}
+    <div data-drop-day={date} className={cn(STYLES.cell, isToday && STYLES.today)}>
       <Popover.Root open={addOpen} onOpenChange={setAddOpen}>
         <Popover.Trigger asChild>
           <button
@@ -92,7 +96,7 @@ export function DayCell({
         </Popover.Portal>
       </Popover.Root>
 
-      {/* 숫자 + 칩(각 요소 = 자기 팝오버) */}
+      {/* 숫자 + 칩 */}
       <div className={STYLES.inner}>
         <span
           className={cn(
@@ -105,11 +109,13 @@ export function DayCell({
         </span>
         <div className={STYLES.lines}>
           {shown.map((r) => (
-            <RecordChip key={r.id} record={r} weekday={weekday} />
+            <RecordChip key={r.id} record={r} weekday={weekday} drag={chipDrag} />
           ))}
           {extra > 0 && <span className={STYLES.more}>+{extra}</span>}
         </div>
       </div>
+
+      {isDropTarget && <span className={STYLES.dropRing} aria-hidden />}
     </div>
   );
 }
