@@ -111,6 +111,15 @@ export function dayNoonIsoKST(dayKey: string): string {
   return new Date(`${dayKey}T12:00:00+09:00`).toISOString();
 }
 
+/**
+ * UTC ISO의 KST 시각은 유지하고 날짜만 dayKey('YYYY-MM-DD')로 바꿈 (기록/날짜 이동용)
+ * 예) 9/10 08:30 KST(= 9/9 23:30Z)를 9/12로 -> 9/12 08:30 KST(= 9/11 23:30Z)
+ */
+export function moveToDayKST(iso: string, dayKey: string): string {
+  const time = formatInTimeZone(new Date(iso), TZ, 'HH:mm:ss.SSS');
+  return new Date(`${dayKey}T${time}+09:00`).toISOString();
+}
+
 /** 지난 주(8~14일 전 구간) 'YYYY-MM-DD' 배열 — 전주 비교용 (이번 주와 겹치지 않음) */
 export function prevWeekDayKeysKST(days = 7): string[] {
   const end = startOfDay(toZonedTime(new Date(), TZ));
