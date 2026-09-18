@@ -39,6 +39,7 @@ const STYLES = {
   menuItem:
     'flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors hover:bg-subtle',
 
+  themeItem: 'mt-auto w-full',
   iconBtn: 'rounded-lg p-1.5 text-muted transition-colors hover:bg-subtle hover:text-foreground',
   tooltip:
     'pointer-events-none absolute left-full top-1/2 z-50 ml-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 md:block',
@@ -109,12 +110,7 @@ export function Sidebar() {
         {NAV.map(({ href, label, Icon }) => {
           const active = pathname.startsWith(href);
           return (
-            <Link
-              key={href}
-              href={href}
-              onClick={() => setMobileOpen(false)}
-              className={cn(STYLES.link, active && STYLES.linkActive)}
-            >
+            <Link key={href} href={href} className={cn(STYLES.link, active && STYLES.linkActive)}>
               <Icon size={18} className="shrink-0" />
               <span className={cn('truncate', collapsed && 'md:hidden')}>{label}</span>
               {collapsed && <span className={STYLES.tooltip}>{label}</span>}
@@ -181,7 +177,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    void onLogout();
+                    void logoutAndLeave();
                   }}
                   className={cn(STYLES.menuItem, 'text-danger')}
                 >
@@ -190,7 +186,6 @@ export function Sidebar() {
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-
           <ThemeToggle />
         </div>
 
