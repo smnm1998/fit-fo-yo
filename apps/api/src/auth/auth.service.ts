@@ -9,7 +9,7 @@ import { SignupDto } from './dto/signup.dto';
 import { PasswordService } from './password.service';
 import { GoogleAuthUser } from './strategies/google.strategy';
 
-export type AuthUser = Pick<User, 'id' | 'email' | 'nickname' | 'isGuest'>;
+export type AuthUser = Pick<User, 'id' | 'email' | 'nickname' | 'isGuest' | 'createdAt'>;
 
 export type AuthTokens = {
   accessToken: string;
@@ -50,7 +50,7 @@ export class AuthService {
         nickname: dto.nickname,
         isGuest: false,
       },
-      select: { id: true, email: true, nickname: true, isGuest: true },
+      select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
     });
 
     const tokens = await this.issueTokens(user.id, user.isGuest);
@@ -68,6 +68,7 @@ export class AuthService {
         email: true,
         nickname: true,
         isGuest: true,
+        createdAt: true,
         passwordHash: true,
       },
     });
@@ -89,6 +90,7 @@ export class AuthService {
       email: user.email,
       nickname: user.nickname,
       isGuest: user.isGuest,
+      createdAt: user.createdAt,
     };
     return { user: safeUser, tokens };
   }
@@ -112,7 +114,7 @@ export class AuthService {
   async issueGuest(): Promise<AuthResult> {
     const user = await this.prisma.user.create({
       data: { isGuest: true },
-      select: { id: true, email: true, nickname: true, isGuest: true },
+      select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
     });
 
     const tokens = await this.issueTokens(user.id, user.isGuest);
@@ -127,7 +129,7 @@ export class AuthService {
     // 1. 이미 Google 연동된 user 검색
     let user = await this.prisma.user.findFirst({
       where: { providerId: googleUser.providerId },
-      select: { id: true, email: true, nickname: true, isGuest: true },
+      select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
     });
 
     if (!user) {
@@ -141,7 +143,7 @@ export class AuthService {
         user = await this.prisma.user.update({
           where: { id: byEmail.id },
           data: { providerId: googleUser.providerId },
-          select: { id: true, email: true, nickname: true, isGuest: true },
+          select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
         });
         this.logger.log(`Google account linked to existing user: ${user.id}`);
       } else {
@@ -154,7 +156,7 @@ export class AuthService {
             providerId: googleUser.providerId,
             isGuest: false,
           },
-          select: { id: true, email: true, nickname: true, isGuest: true },
+          select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
         });
         this.logger.log(`Google user created: ${user.id}`);
       }
@@ -193,7 +195,7 @@ export class AuthService {
   async getProfile(userId: string): Promise<AuthUser> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, nickname: true, isGuest: true },
+      select: { id: true, email: true, nickname: true, isGuest: true, createdAt: true },
     });
     if (!user) throw new UnauthorizedException();
     return user;
