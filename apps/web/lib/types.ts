@@ -3,6 +3,7 @@ export type ApiUser = {
   email?: string | null;
   nickname?: string | null;
   isGuest: boolean;
+  createdAt: string;
 };
 
 export type AuthTokens = {

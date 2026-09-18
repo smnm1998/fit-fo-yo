@@ -55,7 +55,7 @@ const STYLES = {
   notice:
     'flex items-center justify-between gap-3 rounded-lg bg-subtle px-3 py-2 text-sm text-danger',
   dismiss: 'shrink-0 text-xs font-medium text-muted hover:text-foreground',
-  cta: 'mt-auto flex w-full items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-surface transition-opacity hover:opacity-90',
+  cta: 'mt-auto hidden w-full items-center justify-center gap-1.5 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-surface transition-opacity hover:opacity-90 md:flex',
 } as const;
 
 type Props = {

@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
 import { getCurrentUser } from '@/lib/server/user';
-import { currentMonthKST, monthRangeKST, todayKST, weekDayKeysAgoKST } from '@/lib/date';
+import {
+  currentMonthKST,
+  monthRangeKST,
+  todayKST,
+  todayWeekIndexKST,
+  weekDayKeysAgoKST,
+  weekRangeAgoKST,
+} from '@/lib/date';
 import { weekStreak } from '@/lib/records';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
@@ -9,8 +16,7 @@ import type { RecommendationDto, RecordDto } from '@/lib/types';
 
 export const metadata: Metadata = { title: '캘린더' };
 
-async function getMonthRecords(month: string): Promise<RecordDto[]> {
-  const { from, to } = monthRangeKST(month);
+async function getRecords(from: string, to: string): Promise<RecordDto[]> {
   const qs = new URLSearchParams({ from, to, limit: '200' });
   const res = await apiFetchAuth(`/records?${qs.toString()}`);
   if (!res.ok) return [];
@@ -34,17 +40,22 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonthKST();
   const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayKST();
-  const [user, initialRecords, initialRecommendations] = await Promise.all([
+
+  const monthRange = monthRangeKST(month);
+  const weekRange = weekRangeAgoKST(0);
+
+  const [user, initialRecords, initialRecommendations, weekRecords] = await Promise.all([
     getCurrentUser(),
-    getMonthRecords(month),
+    getRecords(monthRange.from, monthRange.to),
     getMonthRecommendations(month),
+    getRecords(weekRange.from, weekRange.to),
   ]);
-  const streak = weekStreak(initialRecords, weekDayKeysAgoKST(0));
+
+  const streak = weekStreak(weekRecords, weekDayKeysAgoKST(0));
 
   return (
     <div className="flex flex-col gap-6">
-      <DashboardHeader nickname={user?.nickname} streak={streak} />
-
+      <DashboardHeader nickname={user?.nickname} streak={streak} todayIndex={todayWeekIndexKST()} />
       <CalendarWorkspace
         initialMonth={month}
         initialDate={date}

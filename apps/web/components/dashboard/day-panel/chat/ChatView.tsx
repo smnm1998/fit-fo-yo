@@ -16,7 +16,9 @@ const STYLES = {
   head: 'flex items-center gap-2 px-3.5 py-3',
   back: 'grid h-9 w-9 place-items-center rounded-full border border-border bg-surface text-foreground transition-colors hover:bg-subtle',
   clear:
-    'ml-auto rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
+    'rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted transition-colors hover:bg-subtle hover:text-foreground',
+  headRight: 'ml-auto flex items-center gap-1',
+  headDate: 'text-[13px] font-semibold text-muted',
 
   scroller: 'relative flex min-h-0 flex-1 flex-col',
   body: 'flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-32 pt-1',
@@ -32,9 +34,9 @@ const STYLES = {
     'mt-3 rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90',
 } as const;
 
-type Props = { recordedAt: string; onBack: () => void };
+type Props = { recordedAt: string; onBack: () => void; dateLabelText?: string };
 
-export function ChatView({ recordedAt, onBack }: Props) {
+export function ChatView({ recordedAt, onBack, dateLabelText }: Props) {
   const { messages, sending, send, clear, isFresh, suggestions, gated } = useChat(recordedAt);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -48,11 +50,14 @@ export function ChatView({ recordedAt, onBack }: Props) {
         <button type="button" onClick={onBack} className={STYLES.back} aria-label="뒤로">
           <ArrowLeft size={17} strokeWidth={2.1} />
         </button>
-        {messages.length > 0 && (
-          <button type="button" className={STYLES.clear} onClick={clear}>
-            기록 지우기
-          </button>
-        )}
+        <div className={STYLES.headRight}>
+          {messages.length > 0 && (
+            <button type="button" className={STYLES.clear} onClick={clear}>
+              기록 지우기
+            </button>
+          )}
+          {dateLabelText && <span className={STYLES.headDate}>{dateLabelText}</span>}
+        </div>
       </div>
 
       <div className={STYLES.scroller}>

@@ -145,3 +145,8 @@ export function weekRangeAgoKST(weeksAgo = 0): { from: string; to: string } {
   const to = fromZonedTime(endOfDay(end), TZ).toISOString();
   return { from, to };
 }
+
+/** 이번 주 (일=0 ... 토=6)에서 오늘이 몇 번째 칸인지 - 스트릭 강조용 */
+export function todayWeekIndexKST(): number {
+  return Number(formatInTimeZone(new Date(), TZ, 'i')) % 7;
+}

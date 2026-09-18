@@ -19,6 +19,8 @@ import type { RecommendationDto, RecordDto } from '@/lib/types';
 import { fetchMonthData } from '@/lib/client/month-api';
 import { useDelayedFlag } from '@/lib/hooks/useDelayedFlag';
 import { useMoveRecord } from '@/lib/hooks/useMoveRecord';
+import Link from 'next/link';
+import { AiMark } from '@/components/dashboard/day-panel/chat/AiMark';
 
 const STYLES = {
   toolbar: 'flex items-center gap-2',
@@ -29,6 +31,8 @@ const STYLES = {
     'ml-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground',
   splitGrid: 'grid items-start gap-6 lg:grid-cols-[1fr_24rem]',
   skeleton: 'h-[22rem] animate-pulse rounded-2xl bg-subtle',
+  aiCta:
+    'flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-bold text-surface transition-opacity active:opacity-90 md:hidden',
 } as const;
 
 type MonthEntry = { records: RecordDto[]; recs: RecommendationDto[] };
@@ -200,7 +204,13 @@ export function CalendarWorkspace({
       </div>
 
       <div className={STYLES.splitGrid}>
-        {calendar}
+        <div className="flex flex-col gap-3">
+          {calendar}
+          <Link href={`/chat?date=${date}`} className={STYLES.aiCta}>
+            <AiMark size={18} />
+            AI 로 기록하기
+          </Link>
+        </div>
         <DayPanel
           dateLabelText={dateLabelDow(date)}
           isToday={date === todayKST()}
