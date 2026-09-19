@@ -29,6 +29,9 @@ export const MEAL_LABEL: Record<string, string> = {
   SNACK: '간식',
 };
 
+/** 끼니 표시 순서 (ETC = 끼니 미지정) */
+export const MEAL_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'ETC'] as const;
+
 export const MEAL_OPTIONS = [
   { value: '', label: '식사 선택' },
   { value: 'BREAKFAST', label: '아침' },
