@@ -6,7 +6,8 @@ import type { ChatCard, ChatMsg } from '@/lib/store/chat-store';
 import { AiMark, AI_GLOW, AI_TONE } from './AiMark';
 
 const STYLES = {
-  turn: 'flex flex-col gap-2.5 animate-[slideUpIn_240ms_ease-out]',
+  turn: 'flex flex-col gap-2.5',
+  turnIn: 'animate-[slideUpIn_240ms_ease-out]',
   userMsg:
     'ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-[16px_16px_5px_16px] bg-accent px-3.5 py-2 text-xs leading-relaxed text-surface',
 
@@ -40,7 +41,7 @@ type Props = {
 
 export function ChatMessage({ msg, animate }: Props) {
   return (
-    <div className={STYLES.turn}>
+    <div className={cn(STYLES.turn, animate && STYLES.turnIn)}>
       <div className={STYLES.userMsg}>{msg.text}</div>
 
       {msg.status === 'pending' && (
