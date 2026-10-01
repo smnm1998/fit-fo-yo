@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
 const MAX_HEIGHT = 128;
 
 const STYLES = {
-  dock: 'absolute inset-x-0 bottom-0 flex flex-col gap-2.5 px-4 pb-4 pt-10',
+  dock: 'absolute inset-x-0 bottom-0 flex flex-col gap-2.5 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-10',
 
   suggestWrap: 'flex flex-col items-end gap-1.5',
   suggestToggle:

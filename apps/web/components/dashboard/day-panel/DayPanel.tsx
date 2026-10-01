@@ -1,6 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { dayKeyKST } from '@/lib/date';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { COMPACT_QUERY } from '@/lib/media';
 import type { DayTotals } from '@/lib/records';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 import { DashboardView } from './DashboardView';
@@ -13,31 +17,26 @@ type Props = {
   totals: DayTotals;
   dayRec: RecommendationDto | null;
   dayRecords: RecordDto[];
+  onLeave?: () => void;
 };
 
-export function DayPanel({
-  dateLabelText,
-  isToday,
-  recordedAt,
-  totals,
-  dayRec,
-  dayRecords,
-}: Props) {
+export function DayPanel({ onLeave, ...props }: Props) {
   const [mode, setMode] = useState<'dashboard' | 'input'>('dashboard');
+  const router = useRouter();
+  const isCompact = useMediaQuery(COMPACT_QUERY);
 
   if (mode === 'input') {
-    return <ChatView recordedAt={recordedAt} onBack={() => setMode('dashboard')} />;
+    return <ChatView recordedAt={props.recordedAt} onBack={() => setMode('dashboard')} />;
   }
 
-  return (
-    <DashboardView
-      dateLabelText={dateLabelText}
-      isToday={isToday}
-      recordedAt={recordedAt}
-      totals={totals}
-      dayRec={dayRec}
-      dayRecords={dayRecords}
-      onOpenChat={() => setMode('input')}
-    />
-  );
+  function openChat() {
+    if (isCompact) {
+      onLeave?.();
+      router.push(`/chat?date=${dayKeyKST(props.recordedAt)}`);
+      return;
+    }
+    setMode('input');
+  }
+
+  return <DashboardView {...props} onOpenChat={openChat} />;
 }
