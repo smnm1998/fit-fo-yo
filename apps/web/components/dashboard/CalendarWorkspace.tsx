@@ -21,18 +21,21 @@ import { useDelayedFlag } from '@/lib/hooks/useDelayedFlag';
 import { useMoveRecord } from '@/lib/hooks/useMoveRecord';
 import Link from 'next/link';
 import { AiMark } from '@/components/dashboard/day-panel/chat/AiMark';
+import { useMediaQuery } from '@/lib/hooks/useMediaQuery';
+import { DaySheet } from '@/components/dashboard/day-panel/DaySheet';
+import { COMPACT_QUERY } from '@/lib/media';
 
 const STYLES = {
   toolbar: 'flex items-center gap-2',
   navBtn:
     'grid h-8 w-8 place-items-center rounded-lg border border-border bg-surface text-muted transition-colors hover:border-muted hover:text-foreground',
   month: 'px-1 text-lg font-bold tabular-nums text-foreground',
-  todayBtn:
-    'ml-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground',
-  splitGrid: 'grid items-start gap-6 lg:grid-cols-[1fr_24rem]',
   skeleton: 'h-[22rem] animate-pulse rounded-2xl bg-subtle',
+  todayBtn:
+    'ml-auto rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:text-foreground wide:ml-1.5',
+  splitGrid: 'grid items-start gap-6 wide:grid-cols-[1fr_24rem]',
   aiCta:
-    'flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-bold text-surface transition-opacity active:opacity-90 md:hidden',
+    'flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3.5 text-sm font-bold text-surface transition-opacity active:opacity-90 wide:hidden',
 } as const;
 
 type MonthEntry = { records: RecordDto[]; recs: RecommendationDto[] };
@@ -58,6 +61,8 @@ export function CalendarWorkspace({
   const records = useRecordsStore((s) => s.records);
   const moveRecord = useMoveRecord();
   const setRecords = useRecordsStore((s) => s.setRecords);
+  const isCompact = useMediaQuery(COMPACT_QUERY);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // 월별 스냅샷 캐시 (재방문/인접 이동 즉시) + 레이스 가드용 현재 월 ref
   const cache = useRef(new Map<string, MonthEntry>());
@@ -141,6 +146,7 @@ export function CalendarWorkspace({
   function selectDate(next: string) {
     setDate(next);
     syncUrl(month, next);
+    if (isCompact) setSheetOpen(true);
   }
 
   function goToday() {
@@ -162,7 +168,20 @@ export function CalendarWorkspace({
     () => recommendations.find((r) => dayKeyKST(r.forDate) === date) ?? null,
     [recommendations, date],
   );
+
   const totals = sumRecords(dayRecords);
+
+  const dayPanel = (
+    <DayPanel
+      dateLabelText={dateLabelDow(date)}
+      isToday={date === todayKST()}
+      recordedAt={dayNoonIsoKST(date)}
+      totals={totals}
+      dayRec={dayRec}
+      dayRecords={dayRecords}
+      onLeave={() => setSheetOpen(false)}
+    />
+  );
 
   const showSkeleton = useDelayedFlag(loading);
 
@@ -211,15 +230,15 @@ export function CalendarWorkspace({
             AI 로 기록하기
           </Link>
         </div>
-        <DayPanel
-          dateLabelText={dateLabelDow(date)}
-          isToday={date === todayKST()}
-          recordedAt={dayNoonIsoKST(date)}
-          totals={totals}
-          dayRec={dayRec}
-          dayRecords={dayRecords}
-        />
+
+        {/* 데스크탑: 우측 패널 */}
+        <div className="hidden wide:block">{dayPanel}</div>
       </div>
+
+      {/* 모바일·태블릿: 날짜 탭 → 바텀시트 */}
+      <DaySheet open={sheetOpen} onOpenChange={setSheetOpen} title={dateLabelDow(date)}>
+        {dayPanel}
+      </DaySheet>
     </div>
   );
 }

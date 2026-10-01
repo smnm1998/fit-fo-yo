@@ -16,7 +16,10 @@ import { AddRecordModal } from './AddRecordModal';
 const RECENT_LIMIT = 4;
 
 const STYLES = {
-  panel: 'flex h-full flex-col gap-4 animate-[viewInLeft_220ms_ease-out]',
+  panel: 'flex flex-col gap-4 animate-[viewInLeft_220ms_ease-out] wide:h-[calc(100dvh-11rem)]',
+  listWrap: 'flex min-h-0 flex-col gap-2 wide:flex-1',
+  rowList: 'flex flex-col gap-2 wide:min-h-0 wide:overflow-y-auto',
+
   head: 'flex items-baseline gap-2',
   date: 'text-base font-bold text-foreground',
   today: 'rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-surface',
@@ -32,8 +35,6 @@ const STYLES = {
   totalValue: 'text-sm font-bold tabular-nums',
   totalUnit: 'text-[11px] font-medium text-muted',
 
-  listWrap: 'flex flex-col gap-2',
-  rowList: 'flex flex-col gap-2',
   empty: 'rounded-xl border border-dashed border-border py-6 text-center text-xs text-muted',
   toggle:
     'mx-auto flex items-center gap-0.5 text-xs font-medium text-muted transition-colors hover:text-foreground',
