@@ -34,9 +34,14 @@ const STYLES = {
     'mt-3 rounded-xl bg-foreground px-5 py-2.5 text-sm font-semibold text-background transition-opacity hover:opacity-90',
 } as const;
 
-type Props = { recordedAt: string; onBack: () => void; dateLabelText?: string };
+type Props = {
+  recordedAt: string;
+  onBack: () => void;
+  dateLabelText?: string;
+  className?: string;
+};
 
-export function ChatView({ recordedAt, onBack, dateLabelText }: Props) {
+export function ChatView({ recordedAt, onBack, dateLabelText, className }: Props) {
   const { messages, sending, send, clear, isFresh, suggestions, gated } = useChat(recordedAt);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +50,7 @@ export function ChatView({ recordedAt, onBack, dateLabelText }: Props) {
   }, [messages]);
 
   return (
-    <div className={STYLES.panel}>
+    <div className={cn(STYLES.panel, className)}>
       <div className={STYLES.head}>
         <button type="button" onClick={onBack} className={STYLES.back} aria-label="뒤로">
           <ArrowLeft size={17} strokeWidth={2.1} />
