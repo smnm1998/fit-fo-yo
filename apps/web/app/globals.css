@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant wide (@media (min-width: 1024px) and (orientation: landscape));
 
 :root {
   --background: #f9f9f9;
@@ -202,6 +203,24 @@
 @keyframes markerSweep {
   to {
     background-size: 100% 100%;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheetUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 
