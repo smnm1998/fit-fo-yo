@@ -14,7 +14,7 @@ describe('NutritionService', () => {
     service = moduleRef.get(NutritionService);
   });
 
-  it('normalizeFoodName: 공백 제거 + 소문자 (seed.ts normalize 와 동일)', () => {
+  it('normalizeFoodName: 공백 제거 + 소문자', () => {
     expect(normalizeFoodName(' 불닭 볶음면 ')).toBe('불닭볶음면');
     expect(normalizeFoodName('Americano')).toBe('americano');
   });

@@ -8,17 +8,28 @@ export const DEFAULT_WEIGHT_KG = 65;
 type DietItem = ParsedDietPayload['items'][number];
 type ExerciseItem = ParsedExercisePayload['items'][number];
 
-/** g/ml로 무게를 직접  준 경우만 LLM grams 신뢰, 아니면 DB 대표 그램수 x 수량 */
+/**
+ * 계산에 쓸 무게(g)와 그 무게에 근거가 있는지,
+ * 1) 단위가 g/ml 이면 사용자가 말한 무게 (근거 있음)
+ * 2) 공식 1회 분량(포장 내용량)이 있으면 수량 x 1회 분량 (근거 있음)
+ * 3) 둘 다 없으면 LLM이 환산한 그램 (근거 없음)
+ */
 function resolveGrams(
   item: { unit?: string; quantity?: number; gramsEstimate?: number },
-  gramsPerServing: number,
-): number {
+  gramsPerServing: number | null,
+): { grams: number; grounded: boolean } | null {
   const { unit, quantity, gramsEstimate } = item;
-  if ((unit === 'g' || unit === 'ml') && typeof gramsEstimate === 'number' && gramsEstimate > 0) {
-    return gramsEstimate;
+  const estimate = typeof gramsEstimate === 'number' && gramsEstimate > 0 ? gramsEstimate : null;
+
+  if ((unit === 'g' || unit === 'ml') && estimate !== null) {
+    return { grams: estimate, grounded: true };
   }
-  const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
-  return qty * gramsPerServing;
+
+  if (gramsPerServing !== null) {
+    const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+    return { grams: qty * gramsPerServing, grounded: true };
+  }
+  return estimate !== null ? { grams: estimate, grounded: false } : null;
 }
 
 /**
@@ -43,7 +54,9 @@ function resolveCalories(item: {
 }
 
 /**
- * 등록 음식이면 DB 근거값으로 확정 (estimagted=false), 미등록이면 LLM 재계산 폴백
+ * 칼로리 = 100g당 열량 x 무게
+ * - DB(식약처 값)에 있으면 열량은 공식 값, 무게까지 근거가 있을 때만 확정
+ * - DB에 없거나 무게를 정할 수 없으면 LLM 근거값으로 재계산 폴백
  */
 export function groundCalories(
   item: {
@@ -51,19 +64,20 @@ export function groundCalories(
     unit?: string;
     quantity?: number;
     gramsEstimate?: number;
-    caloriesPer100g?: number;
+    caloriesPerr100g?: number;
     calories?: number;
     estimated: boolean;
   },
   table: Map<string, FoodNutrition>,
 ): { calories?: number; grams?: number; estimated: boolean } {
   const hit = table.get(normalizeFoodName(item.name));
-  if (hit) {
-    const grams = resolveGrams(item, hit.gramsPerServing);
+  const weight = hit ? resolveGrams(item, hit.gramsPerServing) : null;
+
+  if (hit && weight) {
     return {
-      calories: Math.round((hit.caloriesPer100g * grams) / 100),
-      grams: Math.round(grams),
-      estimated: false,
+      calories: Math.round((hit.caloriesPer100g * weight.grams) / 100),
+      grams: Math.round(weight.grams),
+      estimated: !weight.grounded,
     };
   }
 
@@ -71,6 +85,7 @@ export function groundCalories(
     typeof item.gramsEstimate === 'number' && item.gramsEstimate > 0
       ? Math.round(item.gramsEstimate)
       : undefined;
+
   return { calories: resolveCalories(item), grams, estimated: item.estimated };
 }
 

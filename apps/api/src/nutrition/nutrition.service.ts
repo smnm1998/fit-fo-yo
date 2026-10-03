@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { FoodNutrition } from '@fitfoyo/database';
 import { PrismaService } from '../prisma/prisma.service';
 
-/** seed.ts 의 normalize 와 반드시 동일 로직 */
+/** 저장, 조회 모두 이 함수로 이름을 정규화한다 (공백 제거 + 소문자) */
 export function normalizeFoodName(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, '');
 }
