@@ -22,6 +22,7 @@ export const PARSE_RECORD_SYSTEM_PROMPT = `
 3. **100g 기준 → 총량 계산**: \`caloriesPer100g\` 를 먼저 정하고, \`calories = round(caloriesPer100g × gramsEstimate / 100)\` 으로 **계산해서** 채웁니다. 두 값이 서로 모순되면 안 됩니다.
 
 - 분량 표현이 모호하면 인분 기준으로 환산하세요: **소량/조금 ≈ 0.6인분, 보통/기본 = 1인분, 많이/곱빼기 ≈ 1.5인분**. 명확한 근거 없이 0.5인분 미만으로 잡지 마세요.
+- \`name\`: 포장지·메뉴판에 적히는 **정식 이름**으로 씁니다. 줄임말·오타는 풀어 쓰고(불닭 → 불닭볶음면, 김볶 → 김치볶음밥), 브랜드·제품명은 그대로 둡니다(신라면 ≠ 라면). 수량·크기 표현은 넣지 않습니다. 서버가 이 이름으로 공공 영양 데이터를 찾습니다.
 - \`mealType\`: "아침/점심/저녁/간식" 이 명시되면 매핑. **없으면 필드를 생략하세요(빈 문자열 "" 금지).**
 - 탄수화물/단백질/지방도 같은 \`gramsEstimate\` 기준으로 일관되게 채우세요.
 - 사용자가 수치를 직접 명시했으면 그 값을 우선합니다.
@@ -43,12 +44,16 @@ export const PARSE_RECORD_SYSTEM_PROMPT = `
 
 입력: "점심에 김치찌개랑 밥 한 공기"
 → record_diet items:
-- { name:"김치찌개", mealType:"LUNCH", quantity:1, unit:"인분", gramsEstimate:400, caloriesPer100g:55, calories:220, estimated:true }
-- { name:"쌀밥", mealType:"LUNCH", quantity:1, unit:"공기", gramsEstimate:210, caloriesPer100g:143, calories:300, estimated:true }
+- { name:"김치찌개", mealType:"LUNCH", quantity:1, unit:"인분", gramsEstimate:400, caloriesPer100g:61, calories:244, estimated:true }
+- { name:"쌀밥", mealType:"LUNCH", quantity:1, unit:"공기", gramsEstimate:210, caloriesPer100g:166, calories:349, estimated:true }
 
 입력: "닭가슴살 200g 먹음"
 → record_diet items:
-- { name:"닭가슴살", quantity:200, unit:"g", gramsEstimate:200, caloriesPer100g:165, calories:330, protein:62, estimated:true }
+- { name:"닭가슴살", quantity:200, unit:"g", gramsEstimate:200, caloriesPer100g:127, calories:254, protein:62, estimated:true }
+
+입력: "불닭 2개"
+→ record_diet items:
+- { name:"불닭볶음면", quantity:2, unit:"개", gramsEstimate:280, caloriesPer100g:379, calories:1061, estimated:true }
 
 입력: "30분 조깅"
 → record_exercise items:
