@@ -279,7 +279,15 @@ describe('AiService', () => {
       // 실제 시드값: 불닭볶음면 { caloriesPer100g: 408, gramsPerServing: 130 }
       nutrition.lookupMany.mockResolvedValue(
         new Map([
-          ['불닭볶음면', { name: '불닭볶음면', caloriesPer100g: 408, gramsPerServing: 130 }],
+          [
+            '불닭볶음면',
+            {
+              name: '불닭볶음면',
+              foodCd: 'P108-009000400-0210',
+              caloriesPer100g: 379,
+              gramsPerServing: 140,
+            },
+          ],
         ]),
       );
       openai.chatWithTools.mockResolvedValue(
@@ -302,15 +310,26 @@ describe('AiService', () => {
 
       const arg = records.createFromParsed.mock.calls[0][0];
       expect(arg.dietItems[0].calories).toBe(1061);
-      expect(arg.dietItems[0].grams).toBe(260); // 2공기 × 130g
+      expect(arg.dietItems[0].grams).toBe(280); // 2봉 × 140g
       expect(arg.dietItems[0].estimated).toBe(false);
     });
 
     it('등록 음식을 g/ml 로 주면 사용자 그램수 × DB 밀도 로 계산한다', async () => {
-      // 실제 시드값: 닭가슴살 { caloriesPer100g: 165, gramsPerServing: 100 }
+      // 식약처 원재료 R209-008000546-0000 닭고기_가슴(껍질 제거)_삶은것: 127kcal/100g
       nutrition.lookupMany.mockResolvedValue(
-        new Map([['닭가슴살', { name: '닭가슴살', caloriesPer100g: 165, gramsPerServing: 100 }]]),
+        new Map([
+          [
+            '닭가슴살',
+            {
+              name: '닭가슴살',
+              foodCd: 'R209-008000546-0000',
+              caloriesPer100g: 127,
+              gramsPerServing: null,
+            },
+          ],
+        ]),
       );
+
       openai.chatWithTools.mockResolvedValue(
         toolCallResponse('record_diet', {
           items: [
@@ -319,7 +338,7 @@ describe('AiService', () => {
               quantity: 200,
               unit: 'g',
               gramsEstimate: 200, // 무게 직접 지정 → g 분기에서 신뢰
-              caloriesPer100g: 999, // LLM 값은 무시, DB 165 사용
+              caloriesPer100g: 999, // LLM 값은 무시, DB 127 사용
               calories: 1998,
               estimated: true,
             },
@@ -330,7 +349,7 @@ describe('AiService', () => {
       await service.parseAndSave({ userId: 'u1', rawInput: '닭가슴살 200g' });
 
       const arg = records.createFromParsed.mock.calls[0][0];
-      expect(arg.dietItems[0].calories).toBe(330); // 165 × 200 / 100
+      expect(arg.dietItems[0].calories).toBe(254); // 127 × 200 / 100
       expect(arg.dietItems[0].estimated).toBe(false);
     });
   });

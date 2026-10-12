@@ -3,7 +3,14 @@ import type { ChatCompletionTool } from 'openai/resources/chat/completions';
 const dietItemSchema = {
   type: 'object',
   properties: {
-    name: { type: 'string', description: '음식명' },
+    name: {
+      type: 'string',
+      description:
+        '음식명. 포장지·메뉴판에 적히는 정식 이름으로 쓰세요. ' +
+        '줄임말·오타는 풀어 쓰고(불닭 → 불닭볶음면, 김볶 → 김치볶음밥, 김치찌게 → 김치찌개), ' +
+        '브랜드·제품명은 그대로 두며(신라면을 라면으로 바꾸지 않음), ' +
+        '수량·크기 표현은 넣지 않습니다.',
+    },
     mealType: {
       type: 'string',
       enum: ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'],
