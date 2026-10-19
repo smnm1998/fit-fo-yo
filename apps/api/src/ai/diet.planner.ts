@@ -28,17 +28,19 @@ function mealOf(items: { mealType?: MealType | null }[]): MealType | null {
   return meals.size === 1 && only ? only : null;
 }
 
-/** 끼니가 서로 다르게 적혀 있을 때만 다른 식사로 봄 (한쪽이 비어 있으면 같은 식사일 수 있다) */
-function mayBeSameMeal(a?: MealType | null, b?: MealType | null): boolean {
-  return !a || !b || a === b;
+/**
+ * 같은 끼니인가 체크
+ * 둘 다 끼니가 없으면 같은 것으로 봄 (끼니 없이 같은 음식을 두 번 말한 경우)
+ */
+function sameMeal(a?: MealType | null, b?: MealType | null): boolean {
+  return (a ?? null) === (b ?? null);
 }
 
 function alreadyRecorded(day: DayDietRecord[], item: Incoming): boolean {
   const key = normalizeFoodName(item.name);
   return day.some((record) =>
     record.dietItems.some(
-      (saved) =>
-        normalizeFoodName(saved.name) === key && mayBeSameMeal(saved.mealType, item.mealType),
+      (saved) => normalizeFoodName(saved.name) === key && sameMeal(saved.mealType, item.mealType),
     ),
   );
 }

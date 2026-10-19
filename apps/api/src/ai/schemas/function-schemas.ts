@@ -13,9 +13,12 @@ const dietItemSchema = {
     },
     mealType: {
       type: 'string',
-      enum: ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK'],
-      description: '식사 시점',
+      enum: ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'NONE'],
+      description:
+        '사용자가 말한 끼니. 아침=BREAKFAST, 점심=LUNCH, 저녁=DINNER, 간식=SNACK. ' +
+        '끼니를 말하지 않았으면 NONE (추측해서 채우지 않습니다).',
     },
+
     quantity: { type: 'number', description: '사용자 표현 기준 수량 (예: 1, 200)' },
     unit: {
       type: 'string',
@@ -51,6 +54,7 @@ const dietItemSchema = {
   },
   required: [
     'name',
+    'mealType',
     'quantity',
     'unit',
     'gramsEstimate',
@@ -58,6 +62,7 @@ const dietItemSchema = {
     'calories',
     'estimated',
   ],
+
   additionalProperties: false,
 } as const;
 
@@ -105,6 +110,40 @@ const recordDietTool: ChatCompletionTool = {
         },
       },
       required: ['items'],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
+ * 대화형 에이전트용 record_diet
+ * again을 필수로 둬서 모델이 "한 번 더 먹은 것인지"를 매번 정하게 한다 (스킵은 서버가 판단)
+ */
+const chatRecordDietTool: ChatCompletionTool = {
+  type: 'function',
+  function: {
+    name: 'record_diet',
+    description:
+      '사용자가 식단/음식 섭취를 기록하려고 할 때 호출합니다. 이번에 새로 말한 음식만 보내세요. ' +
+      '같은 끼니 기록이 이미 있으면 서버가 거기에 덧붙입니다.',
+    parameters: {
+      type: 'object',
+      properties: {
+        items: { type: 'array', description: '섭취한 음식 항목들', items: dietItemSchema },
+        recordedAt: {
+          type: 'string',
+          format: 'date-time',
+          description: 'ISO8601 시각. 추론 불가하면 생략.',
+        },
+        again: {
+          type: 'boolean',
+          description:
+            '이미 기록된 음식을 한 번 더 먹었다는 뜻이 분명할 때만 true. ' +
+            '("하나 더", "또 먹었어", "한 번 더 추가해줘", 한 번 더 추가할지 묻는 질문에 그렇다고 답한 경우) ' +
+            '그 외에는 false.',
+        },
+      },
+      required: ['items', 'again'],
       additionalProperties: false,
     },
   },
@@ -202,7 +241,7 @@ export const PARSE_RECORD_TOOLS: ChatCompletionTool[] = [
 
 /** 대화형 에이전트용: 생성 + 수정 + 삭제 (도메인 이탈은 자연어로 처리하므로 invalid_domain 제외) */
 export const CHAT_AGENT_TOOLS: ChatCompletionTool[] = [
-  recordDietTool,
+  chatRecordDietTool,
   recordExerciseTool,
   updateRecordTool,
   deleteRecordTool,
@@ -211,7 +250,7 @@ export const CHAT_AGENT_TOOLS: ChatCompletionTool[] = [
 export type ParsedDietPayload = {
   items: Array<{
     name: string;
-    mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK';
+    mealType?: 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'NONE';
     quantity?: number;
     unit?: string;
     gramsEstimate?: number;
@@ -223,6 +262,7 @@ export type ParsedDietPayload = {
     estimated: boolean;
   }>;
   recordedAt?: string;
+  again?: boolean;
 };
 
 export type ParsedExercisePayload = {

@@ -84,10 +84,16 @@ describe('planDiet - 이미 기록된 음식', () => {
     expect(planDiet(day, [food('김치찌개', 'DINNER')], false).kind).toBe('CREATE');
   });
 
-  it('한쪽에 끼니가 없으면 이름만으로 비교한다.', () => {
+  it('끼니 없이 기록된 음식이 있어도, 끼니를 말한 같은 음식은 중복이 아니다.', () => {
+    const day = [saved('r1', null, '불닭볶음면')];
+
+    expect(planDiet(day, [food('불닭볶음면', 'LUNCH')], false).kind).toBe('CREATE');
+  });
+
+  it('끼니를 말해 기록한 음식이 있어도, 끼니 없이 말한 같은 음식은 중복이 아니다.', () => {
     const day = [saved('lunch', 'LUNCH', '김치찌개')];
 
-    expect(planDiet(day, [food('김치찌개')], false).kind).toBe('SKIP');
+    expect(planDiet(day, [food('김치찌개')], false).kind).toBe('CREATE');
   });
 
   it('띄어쓰기만 다른 이름은 같은 음식으로 본다.', () => {

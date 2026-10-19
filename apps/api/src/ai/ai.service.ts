@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, RecordType } from '@fitfoyo/database';
+import { Prisma, RecordType, type MealType } from '@fitfoyo/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { OpenAIClient } from './openai.client';
@@ -24,10 +24,23 @@ import type { ChatCompletionMessageParam } from 'openai/resources/chat/completio
 import { CHAT_AGENT_SYSTEM_PROMPT } from './prompts/chat-agent.system';
 import { UpdateRecordDto } from '../records/dto/update-record.dto';
 import { HealthProfileService } from '../health-profile/health-profile.service';
-import { DEFAULT_WEIGHT_KG, toDietItemInput, toExerciseItemInput } from './calorie.calculator';
+import {
+  DEFAULT_WEIGHT_KG,
+  toDietItemInput,
+  toExerciseItemInput,
+  toMealType,
+} from './calorie.calculator';
+import { planDiet } from './diet.planner';
 
 /** 게스트 AI 사용 상한 (체험용). 초과 시 회원가입 유도. */
 const GUEST_AI_LIMIT = 10;
+
+const MEAL_LABEL: Record<MealType, string> = {
+  BREAKFAST: '아침',
+  LUNCH: '점심',
+  DINNER: '저녁',
+  SNACK: '간식',
+};
 
 @Injectable()
 export class AiService {
@@ -284,20 +297,23 @@ export class AiService {
     const weight = async (): Promise<number> => (cachedWeight ??= await this.loadWeightKg(userId));
 
     for (const call of functionCalls) {
+      this.logger.debug(`tool ${call.function.name} ${call.function.arguments}`);
+
       const args = this.safeParseJson(call.function.arguments);
       let summary: string;
       try {
         switch (call.function.name) {
           case 'record_diet': {
             const payload = args as ParsedDietPayload;
-            const rec = await this.createDiet(
+            const outcome = await this.recordDiet(
               userId,
               payload,
               this.resolveRecordedAt(payload.recordedAt, recordedAt),
               lastUser,
             );
-            mutations.created.push(rec);
-            summary = `식단 등록 완료 (id=${rec.id})`;
+            if (outcome.created) mutations.created.push(outcome.created);
+            if (outcome.updated) mutations.updated.push(outcome.updated);
+            summary = outcome.summary;
             break;
           }
           case 'record_exercise': {
@@ -341,6 +357,9 @@ export class AiService {
       'suggestions는 "사용자가 다음에 그대로 타이핑해 보낼 문구"를 사용자 1인칭 시점으로 2~3개 제안하세요. ' +
       '(예: "저녁도 기록할래", "물 2잔 마셨어", "오늘 총 칼로리 알려줘") ' +
       '봇이 사용자에게 되묻는 질문이 아니라, 사용자가 입력할 프롬프트여야 합니다. ' +
+      '작업 결과에 "이미 기록돼 있어 넣지 않은 항목"이 있으면, 그 음식이 사용자가 이번에 말한 음식일 때만 ' +
+      '이미 기록돼 있다고 알리고 한 번 더 추가할지 물으세요(이때 suggestions 첫 번째는 "응, 한 번 더 추가해줘"). ' +
+      '사용자가 이번에 말하지 않은 음식이면 언급하지 마세요. ' +
       '반드시 JSON만 출력: {"reply": string, "suggestions": string[]}';
 
     const pass2: ChatCompletionMessageParam[] = [
@@ -360,6 +379,67 @@ export class AiService {
     });
 
     return { ...this.parseFinalize(second.choices[0]?.message.content), mutations };
+  }
+
+  /**
+   * 채팅의 식단 기록. 그 날의 식단과 대조한 뒤 처리한다 (planDiet)
+   * - 새 기록 만들기 / 같은 끼니 기록에 덧붙이기 / 전부 이미 있으면 기록하지 않기
+   * summary 는 2차 응답을 만드는 모델이 읽는다
+   */
+  private async recordDiet(
+    userId: string,
+    payload: ParsedDietPayload,
+    recordedAt: Date,
+    rawInput: string,
+  ): Promise<{
+    summary: string;
+    created?: Awaited<ReturnType<RecordsService['createFromParsed']>>;
+    updated?: Awaited<ReturnType<RecordsService['appendDietItems']>>;
+  }> {
+    const { from, to } = this.dayRange(recordedAt.toISOString());
+    const { items: day } = await this.records.findAll(userId, {
+      type: RecordType.DIET,
+      from: from.toISOString(),
+      to: to.toISOString(),
+      limit: 50,
+      offset: 0,
+    });
+
+    // 'NONE' 같은 값을 먼저 정리해야 끼니 비교가 맞는다
+    const items = payload.items.map((item) => ({ ...item, mealType: toMealType(item.mealType) }));
+    const plan = planDiet(day, items, payload.again === true);
+
+    const skipped = plan.skipped.length
+      ? ` 이미 기록돼 있어 넣지 않은 항목: ${plan.skipped.join(', ')}`
+      : '';
+
+    switch (plan.kind) {
+      case 'SKIP':
+        return { summary: skipped ? `기록하지 않음.${skipped}` : '기록할 음식이 없음' };
+      case 'APPEND': {
+        const table = await this.nutrition.lookupMany(plan.items.map((i) => i.name));
+        const rec = await this.records.appendDietItems(
+          userId,
+          plan.recordId,
+          plan.items.map((item) => toDietItemInput(item, table)),
+          rawInput,
+        );
+        const names = plan.items.map((i) => i.name).join(', ');
+        return {
+          updated: rec,
+          summary: `기존 식단 기록에 추가 완료 (id=${rec.id}): ${names}.${skipped}`,
+        };
+      }
+      case 'CREATE': {
+        const rec = await this.createDiet(
+          userId,
+          { ...payload, items: plan.items },
+          recordedAt,
+          rawInput,
+        );
+        return { created: rec, summary: `식단 등록 완료 (id=${rec.id}).${skipped}` };
+      }
+    }
   }
 
   private parseFinalize(content: string | null | undefined): {
@@ -433,10 +513,16 @@ export class AiService {
     if (records.length === 0) return '이 날의 기록: (아직 없음)';
     const lines = records.map((r) => {
       if (r.type === RecordType.DIET) {
+        const meal = r.dietItems.find((d) => d.mealType)?.mealType;
+        const mealLabel = meal ? MEAL_LABEL[meal] : '끼니 미지정';
         const items = r.dietItems
-          .map((d) => `${d.name}${d.calories != null ? ` ${d.calories}kcal` : ''}`)
+          .map((d) => {
+            const amount = d.quantity != null && d.unit ? ` ${d.quantity}${d.unit}` : '';
+            const kcal = d.calories != null ? ` ${d.calories}kcal` : '';
+            return `${d.name}${amount}${kcal}`;
+          })
           .join(', ');
-        return `- id=${r.id} | 식단 | ${items || '항목 없음'}`;
+        return `- id=${r.id} | 식단 | ${mealLabel} | ${items || '항목 없음'}`;
       }
       const items = r.exerciseItems
         .map((e) => `${e.name}${e.durationMinutes != null ? ` ${e.durationMinutes}분` : ''}`)

@@ -1,5 +1,5 @@
 import type { FoodNutrition } from '@fitfoyo/database';
-import { groundCalories } from './calorie.calculator';
+import { groundCalories, toMealType } from './calorie.calculator';
 
 /** 테스트용 영양 행 - 식약처에서 실제로 조회한 값 (2026-10-01) */
 function food(
@@ -97,5 +97,15 @@ describe('groundCalories - 식약처 열량 + AI 무게 (추정)', () => {
         TABLE,
       ),
     ).toEqual({ calories: 250, grams: undefined, estimated: true });
+  });
+});
+
+describe('toMealType - 모델이 준 끼니 값 정리', () => {
+  it('목록에 있는 끼니는 그대로 쓴다.', () => {
+    expect(toMealType('DINNER')).toBe('DINNER');
+  });
+
+  it.each(['NONE', '', '저녁', undefined, null])('%p 는 끼니 없음으로 본다.', (raw) => {
+    expect(toMealType(raw)).toBeUndefined();
   });
 });
