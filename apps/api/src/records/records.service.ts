@@ -133,6 +133,31 @@ export class RecordsService {
     });
   }
 
+  /**
+   * 기존 식단 기록에 음식을 덧붙임
+   * update와 달리 기존 항목을 지우지 않음
+   */
+  async appendDietItems(
+    userId: string,
+    id: string,
+    items: Prisma.DietItemCreateWithoutRecordInput[],
+    rawInput?: string,
+  ) {
+    const existing = await this.findOne(userId, id);
+    if (existing.type !== RecordType.DIET) {
+      throw new BadRequestException('식단 기록에만 음식을 덧붙일 수 있습니다.');
+    }
+
+    return this.prisma.record.update({
+      where: { id },
+      data: {
+        dietItems: { create: items },
+        ...(rawInput ? { rawInput: [existing.rawInput, rawInput].filter(Boolean).join('\n') } : {}),
+      },
+      include: { dietItems: true, exerciseItems: true },
+    });
+  }
+
   async remove(userId: string, id: string) {
     await this.findOne(userId, id);
     await this.prisma.record.delete({ where: { id } });

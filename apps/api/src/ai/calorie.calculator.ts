@@ -1,4 +1,4 @@
-import type { FoodNutrition } from '@fitfoyo/database';
+import { MealType, type FoodNutrition } from '@fitfoyo/database';
 import { normalizeFoodName } from '../nutrition/nutrition.service';
 import type { ParsedDietPayload, ParsedExercisePayload } from './schemas/function-schemas';
 
@@ -110,12 +110,22 @@ export function resolveCaloriesBurned(
   return item.caloriesBurned;
 }
 
-/** 파싱된 식단 아이템 -> Prisma DietItem 입력값 */
+const MEAL_TYPES = new Set<string>(Object.values(MealType));
+
+/**
+ * 모델이 준 끼니 값을 정리
+ * 'NONE(말하지 않음), 빈 값, 목록에 없는 값은 모두 "끼니 없음"
+ */
+export function toMealType(raw: string | null | undefined): MealType | undefined {
+  return raw && MEAL_TYPES.has(raw) ? (raw as MealType) : undefined;
+}
+
+/** 파생된 식단 아이템 -> Prisma DietItem 입력값 */
 export function toDietItemInput(item: DietItem, table: Map<string, FoodNutrition>) {
   const grounded = groundCalories(item, table);
   return {
     name: item.name,
-    mealType: item.mealType || undefined,
+    mealType: toMealType(item.mealType),
     quantity: item.quantity,
     unit: item.unit,
     grams: grounded.grams,

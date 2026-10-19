@@ -1,4 +1,5 @@
 {
+  "typescript.preferences.importModuleSpecifier": "relative",
   "tailwindCSS.classFunctions": ["cva", "cn", "clsx"],
   "tailwindCSS.experimental.classRegex": [["STYLES\\s*=\\s*\\{([\\s\\S]*?)\\}", "'([^']*)'"]]
 }

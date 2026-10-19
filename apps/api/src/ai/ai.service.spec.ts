@@ -23,15 +23,21 @@ function toolCallResponse(name: string, args: unknown) {
 
 describe('AiService', () => {
   let service: AiService;
-  let openai: { chatWithTools: jest.Mock };
-  let records: { createFromParsed: jest.Mock };
+  let openai: { chatWithTools: jest.Mock; chat: jest.Mock };
+  let records: { createFromParsed: jest.Mock; findAll: jest.Mock; appendDietItems: jest.Mock };
   let nutrition: { lookupMany: jest.Mock };
   let healthProfile: { get: jest.Mock };
 
   beforeEach(async () => {
-    openai = { chatWithTools: jest.fn() };
-    records = { createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })) };
-    // 기본: 시드 미등록(빈 Map) → LLM 재계산 폴백. 등록 케이스는 테스트마다 override.
+    openai = { chatWithTools: jest.fn(), chat: jest.fn() };
+    records = {
+      createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })),
+      findAll: jest.fn().mockResolvedValue({ items: [] }),
+      appendDietItems: jest.fn((_userId, id, items) =>
+        Promise.resolve({ id, dietItems: items, exerciseItems: [] }),
+      ),
+    };
+
     nutrition = { lookupMany: jest.fn().mockResolvedValue(new Map()) };
     healthProfile = { get: jest.fn().mockResolvedValue(null) };
 
@@ -351,6 +357,175 @@ describe('AiService', () => {
       const arg = records.createFromParsed.mock.calls[0][0];
       expect(arg.dietItems[0].calories).toBe(254); // 127 × 200 / 100
       expect(arg.dietItems[0].estimated).toBe(false);
+    });
+  });
+
+  describe('chat - 식단을 기록하기 전에 그 날 기록과 대조한다', () => {
+    /** 이미 저장된 식단 기록 (records.findAll 이 돌려주는 모양) */
+    function savedDiet(
+      id: string,
+      mealType: string | null,
+      ...items: Array<{ name: string; quantity?: number; unit?: string; calories?: number }>
+    ) {
+      return {
+        id,
+        type: RecordType.DIET,
+        dietItems: items.map((item) => ({ ...item, mealType })),
+        exerciseItems: [],
+      };
+    }
+
+    /** 1차 호출은 record_diet 툴 호출, 2차 호출은 JSON 응답을 돌려주게 한다 */
+    function mockRecordDiet(args: unknown) {
+      openai.chat
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_1',
+                    type: 'function',
+                    function: { name: 'record_diet', arguments: JSON.stringify(args) },
+                  },
+                ],
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+        });
+    }
+
+    /** n번째 openai.chat 호출에 넘어간 메시지들 */
+    function sentMessages(call: number): Array<{ role: string; content: string }> {
+      const arg = openai.chat.mock.calls[call]?.[0] as {
+        messages: Array<{ role: string; content: string }>;
+      };
+      return arg.messages;
+    }
+
+    /** 2차 응답을 만드는 모델에게 넘어간 툴 실행 결과 */
+    function toolResult(): string {
+      return sentMessages(1).find((m) => m.role === 'tool')?.content ?? '';
+    }
+
+    function say(content: string) {
+      return service.chat({ userId: 'u1', messages: [{ role: 'user', content }] });
+    }
+
+    it('같은 음식을 다시 말하면 기록하지 않고, 이미 있다는 사실을 2차 응답에 넘긴다.', async () => {
+      records.findAll.mockResolvedValue({
+        items: [savedDiet('lunch', 'LUNCH', { name: '불닭볶음면', quantity: 2, unit: '개' })],
+      });
+      mockRecordDiet({
+        items: [
+          { name: '불닭볶음면', mealType: 'LUNCH', quantity: 2, unit: '개', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('불닭볶음면 2개 점심에 먹음');
+
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(records.appendDietItems).not.toHaveBeenCalled();
+      expect(result.mutations.created).toHaveLength(0);
+      expect(toolResult()).toContain('이미 기록돼 있어 넣지 않은 항목: 불닭볶음면');
+    });
+
+    it('again 이면 같은 음식도 한 번 더 기록한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [{ name: '불닭볶음면', quantity: 2, unit: '개', estimated: true }],
+        again: true,
+      });
+
+      const result = await say('응, 한 번 더 추가해줘');
+
+      expect(records.createFromParsed).toHaveBeenCalledTimes(1);
+      expect(result.mutations.created).toHaveLength(1);
+    });
+
+    it('같은 끼니에 더하면 새 기록을 만들지 않고 새 음식만 기존 기록에 붙인다. (샐러드 중복 기록 회귀)', async () => {
+      records.findAll.mockResolvedValue({
+        items: [savedDiet('lunch', 'LUNCH', { name: '닭가슴살 샐러드' })],
+      });
+      // 모델이 끼니 전체를 다시 보낸 상황
+      mockRecordDiet({
+        items: [
+          { name: '닭가슴살 샐러드', mealType: 'LUNCH', estimated: true },
+          { name: '쌀밥', mealType: 'LUNCH', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('점심에 밥도 추가해줘');
+
+      const [userId, recordId, items, rawInput] = records.appendDietItems.mock.calls[0] as [
+        string,
+        string,
+        Array<{ name: string }>,
+        string,
+      ];
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(userId).toBe('u1');
+      expect(recordId).toBe('lunch');
+      expect(items.map((i) => i.name)).toEqual(['쌀밥']);
+      expect(rawInput).toBe('점심에 밥도 추가해줘');
+      expect(result.mutations.updated).toHaveLength(1);
+    });
+
+    it('끼니 없이 기록된 음식이 있어도, 끼니를 말한 같은 음식은 묻지 않고 기록한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [
+          { name: '불닭볶음면', mealType: 'LUNCH', quantity: 2, unit: '개', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('점심에 불닭 2개 먹음');
+
+      expect(records.createFromParsed).toHaveBeenCalledTimes(1);
+      expect(result.mutations.created).toHaveLength(1);
+    });
+
+    it('모델이 끼니를 NONE 으로 주면 끼니 없이 저장하고, 끼니 없는 같은 음식과 대조한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [{ name: '불닭볶음면', mealType: 'NONE', quantity: 2, unit: '개', estimated: true }],
+        again: false,
+      });
+
+      await say('불닭볶음면 2개 먹었어');
+
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(toolResult()).toContain('이미 기록돼 있어 넣지 않은 항목: 불닭볶음면');
+    });
+
+    it('모델에게 주는 "이 날의 기록"에 끼니와 수량을 싣는다.', async () => {
+      records.findAll.mockResolvedValue({
+        items: [
+          savedDiet('lunch', 'LUNCH', {
+            name: '불닭볶음면',
+            quantity: 2,
+            unit: '개',
+            calories: 1061,
+          }),
+        ],
+      });
+      // 툴 호출 없이 답만 하는 턴
+      openai.chat.mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+      });
+
+      await say('오늘 뭐 먹었지?');
+
+      expect(sentMessages(0)[0]?.content).toContain(
+        '- id=lunch | 식단 | 점심 | 불닭볶음면 2개 1061kcal',
+      );
     });
   });
 });
