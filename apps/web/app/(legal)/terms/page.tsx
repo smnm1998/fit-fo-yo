@@ -62,9 +62,7 @@ export default function TermsPage() {
 
       <section className={STYLES.section}>
         <h2 className={STYLES.h2}>제6조 (준거법 및 문의)</h2>
-        <p className={STYLES.p}>
-          본 약관은 대한민국 법률에 따릅니다. 문의: {'{{smnm9812@gmail.com}}'}
-        </p>
+        <p className={STYLES.p}>본 약관은 대한민국 법률에 따릅니다. 문의: smnm9812@gmail.com</p>
       </section>
     </article>
   );
