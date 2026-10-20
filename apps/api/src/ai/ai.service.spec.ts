@@ -25,7 +25,7 @@ describe('AiService', () => {
   let service: AiService;
   let openai: { chatWithTools: jest.Mock; chat: jest.Mock };
   let records: { createFromParsed: jest.Mock; findAll: jest.Mock; appendDietItems: jest.Mock };
-  let nutrition: { lookupMany: jest.Mock };
+  let nutrition: { lookupMany: jest.Mock; findEstimates: jest.Mock; rememberEstimates: jest.Mock };
   let healthProfile: { get: jest.Mock };
 
   beforeEach(async () => {
@@ -38,7 +38,11 @@ describe('AiService', () => {
       ),
     };
 
-    nutrition = { lookupMany: jest.fn().mockResolvedValue(new Map()) };
+    nutrition = {
+      lookupMany: jest.fn().mockResolvedValue(new Map()),
+      findEstimates: jest.fn().mockResolvedValue(new Map()),
+      rememberEstimates: jest.fn().mockResolvedValue(undefined),
+    };
     healthProfile = { get: jest.fn().mockResolvedValue(null) };
 
     const moduleRef = await Test.createTestingModule({
@@ -357,6 +361,63 @@ describe('AiService', () => {
       const arg = records.createFromParsed.mock.calls[0][0];
       expect(arg.dietItems[0].calories).toBe(254); // 127 × 200 / 100
       expect(arg.dietItems[0].estimated).toBe(false);
+    });
+
+    it('식약처에 없는 음식은 기억해 둔 추정값으로 계산한다. (대화 맥락이 달라도 같은 칼로리)', async () => {
+      nutrition.findEstimates.mockResolvedValue(
+        new Map([['서브웨이폴드포크30cm', { caloriesPer100g: 250, gramsPerServing: 300 }]]),
+      );
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '서브웨이 폴드포크 30cm',
+              quantity: 1,
+              unit: '개',
+              gramsEstimate: 300,
+              caloriesPer100g: 333, // 이번 맥락에서 AI 가 다르게 추정한 값
+              calories: 999,
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({
+        userId: 'u1',
+        rawInput: '저녁에도 서브웨이 폴드포크 30cm 먹음',
+      });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(750); // 250 × 300 / 100
+      expect(arg.dietItems[0].estimated).toBe(true);
+      expect(nutrition.rememberEstimates).toHaveBeenCalledWith(new Map());
+    });
+
+    it('처음 보는 음식은 이번 추정값으로 계산하고 기억해 둔다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '엽기떡볶이',
+              quantity: 1,
+              unit: '인분',
+              gramsEstimate: 400,
+              caloriesPer100g: 150,
+              calories: 600,
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '엽기떡볶이 1인분 먹음' });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(600);
+      expect(nutrition.rememberEstimates).toHaveBeenCalledWith(
+        new Map([['엽기떡볶이', { caloriesPer100g: 150, gramsPerServing: 400 }]]),
+      );
     });
   });
 

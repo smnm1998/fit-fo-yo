@@ -26,6 +26,7 @@ import { UpdateRecordDto } from '../records/dto/update-record.dto';
 import { HealthProfileService } from '../health-profile/health-profile.service';
 import {
   DEFAULT_WEIGHT_KG,
+  newEstimates,
   toDietItemInput,
   toExerciseItemInput,
   toMealType,
@@ -177,15 +178,29 @@ export class AiService {
     recordedAt: Date,
     rawInput: string,
   ) {
-    const table = await this.nutrition.lookupMany(payload.items.map((i) => i.name));
     return this.records.createFromParsed({
       userId,
       type: RecordType.DIET,
       rawInput,
       parsedJson: payload as unknown as Prisma.InputJsonValue,
       recordedAt,
-      dietItems: payload.items.map((item) => toDietItemInput(item, table)),
+      dietItems: await this.toDietItems(payload.items),
     });
+  }
+
+  /**
+   * 식단 항목 -> 저장한 값
+   * 식약처 값 -> 기억해 둔 추정값 -> 이번 AI 추정값 순서로 계산하고, 처음 본 추정값은 기억해 둠
+   * (같은 음식이 대화 맥락에 따라 기록마다 다른 칼로리가 되지 않게)
+   */
+  private async toDietItems(items: ParsedDietPayload['items']) {
+    const names = items.map((i) => i.name);
+    const [table, estimates] = await Promise.all([
+      this.nutrition.lookupMany(names),
+      this.nutrition.findEstimates(names),
+    ]);
+    await this.nutrition.rememberEstimates(newEstimates(items, table, estimates));
+    return items.map((item) => toDietItemInput(item, table, estimates));
   }
 
   private async createExercise(
@@ -213,9 +228,8 @@ export class AiService {
       const table = await this.nutrition.lookupMany(payload.dietItems.map((i) => i.name));
       dto.dietItems = payload.dietItems.map((item) => toDietItemInput(item, table));
     }
-    if (payload.exerciseItems) {
-      const weightKg = await this.loadWeightKg(userId);
-      dto.exerciseItems = payload.exerciseItems.map((item) => toExerciseItemInput(item, weightKg));
+    if (payload.dietItems) {
+      dto.dietItems = await this.toDietItems(payload.dietItems);
     }
 
     return this.records.update(userId, payload.recordId, dto);
@@ -417,11 +431,10 @@ export class AiService {
       case 'SKIP':
         return { summary: skipped ? `기록하지 않음.${skipped}` : '기록할 음식이 없음' };
       case 'APPEND': {
-        const table = await this.nutrition.lookupMany(plan.items.map((i) => i.name));
         const rec = await this.records.appendDietItems(
           userId,
           plan.recordId,
-          plan.items.map((item) => toDietItemInput(item, table)),
+          await this.toDietItems(plan.items),
           rawInput,
         );
         const names = plan.items.map((i) => i.name).join(', ');
@@ -430,6 +443,7 @@ export class AiService {
           summary: `기존 식단 기록에 추가 완료 (id=${rec.id}): ${names}.${skipped}`,
         };
       }
+
       case 'CREATE': {
         const rec = await this.createDiet(
           userId,

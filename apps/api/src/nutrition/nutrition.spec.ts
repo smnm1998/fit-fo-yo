@@ -201,4 +201,38 @@ describe('NutritionService', () => {
       });
     });
   });
+
+  describe('추정값 기억', () => {
+    const ESTIMATE = { caloriesPer100g: 150, gramsPerServing: 400 };
+
+    it('못 찾음으로 기록된 이름 중 아직 값이 없는 행만 채운다. (처음 값이 이김)', async () => {
+      await service.rememberEstimates(new Map([['엽기떡볶이', ESTIMATE]]));
+
+      expect(prisma.foodLookupMiss.updateMany).toHaveBeenCalledWith({
+        where: { name: '엽기떡볶이', caloriesPer100g: null },
+        data: ESTIMATE,
+      });
+    });
+
+    it('저장에 실패해도 던지지 않는다.', async () => {
+      prisma.foodLookupMiss.updateMany.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.rememberEstimates(new Map([['엽기떡볶이', ESTIMATE]])),
+      ).resolves.toBeUndefined();
+    });
+
+    it('기억해 둔 값을 정규화 이름으로 돌려준다.', async () => {
+      prisma.foodLookupMiss.findMany.mockResolvedValue([{ name: '엽기떡볶이', ...ESTIMATE }]);
+
+      const estimates = await service.findEstimates(['엽기 떡볶이', '없는음식']);
+
+      expect(estimates).toEqual(new Map([['엽기떡볶이', ESTIMATE]]));
+      expect(prisma.foodLookupMiss.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { name: { in: ['엽기떡볶이', '없는음식'] }, caloriesPer100g: { not: null } },
+        }),
+      );
+    });
+  });
 });

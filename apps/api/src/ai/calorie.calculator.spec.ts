@@ -1,5 +1,6 @@
 import type { FoodNutrition } from '@fitfoyo/database';
-import { groundCalories, toMealType } from './calorie.calculator';
+import { estimateOf, groundCalories, newEstimates, toMealType } from './calorie.calculator';
+import type { FoodEstimate } from '../nutrition/nutrition.service';
 
 /** 테스트용 영양 행 - 식약처에서 실제로 조회한 값 (2026-10-01) */
 function food(
@@ -107,5 +108,122 @@ describe('toMealType - 모델이 준 끼니 값 정리', () => {
 
   it.each(['NONE', '', '저녁', undefined, null])('%p 는 끼니 없음으로 본다.', (raw) => {
     expect(toMealType(raw)).toBeUndefined();
+  });
+});
+
+describe('groundCalories - 식약처에 없는 음식은 처음 추정값으로 고정 (추정)', () => {
+  /** 처음 기록할 때 기억해 둔 값: 100g당 250kcal, 1개 300g */
+  const SAVED = new Map<string, FoodEstimate>([
+    ['서브웨이폴드포크30cm', { caloriesPer100g: 250, gramsPerServing: 300 }],
+  ]);
+  const sub = { name: '서브웨이 폴드포크 30cm', estimated: true };
+
+  it('기억해 둔 값이 있으면 이번 AI 추정값 대신 그 값을 쓴다. (같은 메뉴가 1000/999로 갈리던 문제)', () => {
+    expect(
+      groundCalories(
+        {
+          ...sub,
+          quantity: 1,
+          unit: '개',
+          gramsEstimate: 300,
+          caloriesPer100g: 333,
+          calories: 999,
+        },
+        TABLE,
+        SAVED,
+      ),
+    ).toEqual({ calories: 750, grams: 300, estimated: true });
+  });
+
+  it('수량이 달라도 기억한 1개 무게로 계산한다.', () => {
+    expect(groundCalories({ ...sub, quantity: 2, unit: '개' }, TABLE, SAVED)).toEqual({
+      calories: 1500,
+      grams: 600,
+      estimated: true,
+    });
+  });
+
+  it('g으로 말하면 그 무게에 기억한 열량을 곱한다.', () => {
+    expect(
+      groundCalories({ ...sub, quantity: 200, unit: 'g', gramsEstimate: 200 }, TABLE, SAVED),
+    ).toEqual({ calories: 500, grams: 200, estimated: true });
+  });
+
+  it('식약처 값이 있으면 기억해 둔 추정값보다 우선한다.', () => {
+    const wrong = new Map<string, FoodEstimate>([
+      ['불닭볶음면', { caloriesPer100g: 999, gramsPerServing: 999 }],
+    ]);
+    expect(
+      groundCalories(
+        { name: '불닭볶음면', quantity: 2, unit: '봉지', estimated: true },
+        TABLE,
+        wrong,
+      ),
+    ).toEqual({ calories: 1061, grams: 280, estimated: false });
+  });
+
+  it('처음 보는 음식은 이번 추정값으로 계산하되 항상 추정으로 표시한다.', () => {
+    expect(
+      groundCalories(
+        {
+          name: '엽기떡볶이',
+          quantity: 1,
+          unit: '인분',
+          gramsEstimate: 400,
+          caloriesPer100g: 150,
+          estimated: false,
+        },
+        TABLE,
+      ),
+    ).toEqual({ calories: 600, grams: 400, estimated: true });
+  });
+});
+
+describe('estimateOf / newEstimates - 기억해 둘 추정값', () => {
+  it('개수로 말하면 1개 무게를 함께 기억한다.', () => {
+    expect(
+      estimateOf({ unit: '개', quantity: 2, gramsEstimate: 600, caloriesPer100g: 249.6 }),
+    ).toEqual({ caloriesPer100g: 250, gramsPerServing: 300 });
+  });
+
+  it('g으로 말하면 1개 무게는 비워 둔다.', () => {
+    expect(
+      estimateOf({ unit: 'g', quantity: 200, gramsEstimate: 200, caloriesPer100g: 550 }),
+    ).toEqual({
+      caloriesPer100g: 550,
+      gramsPerServing: null,
+    });
+  });
+
+  it('100g당 열량이 없으면 기억하지 않는다.', () => {
+    expect(estimateOf({ unit: '개', quantity: 1, gramsEstimate: 300 })).toBeNull();
+  });
+
+  it('식약처 값도, 기억해 둔 값도 없는 이름만 고른다.', () => {
+    const saved = new Map<string, FoodEstimate>([
+      ['서브웨이폴드포크30cm', { caloriesPer100g: 250, gramsPerServing: 300 }],
+    ]);
+    const items = [
+      { name: '불닭볶음면', quantity: 1, unit: '개', caloriesPer100g: 400, estimated: true },
+      {
+        name: '서브웨이 폴드포크 30cm',
+        quantity: 1,
+        unit: '개',
+        caloriesPer100g: 333,
+        estimated: true,
+      },
+      {
+        name: '엽기떡볶이',
+        quantity: 1,
+        unit: '인분',
+        gramsEstimate: 400,
+        caloriesPer100g: 150,
+        estimated: true,
+      },
+    ];
+
+    expect(newEstimates(items, TABLE, saved)).toEqual(
+      new Map([['엽기떡볶이', { caloriesPer100g: 150, gramsPerServing: 400 }]]),
+    );
   });
 });

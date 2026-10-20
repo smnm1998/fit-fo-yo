@@ -1,5 +1,5 @@
 import { MealType, type FoodNutrition } from '@fitfoyo/database';
-import { normalizeFoodName } from '../nutrition/nutrition.service';
+import { normalizeFoodName, type FoodEstimate } from '../nutrition/nutrition.service';
 import type { ParsedDietPayload, ParsedExercisePayload } from './schemas/function-schemas';
 
 /** 체중 미상 사용자 기본값 (HealthProfile.weightKg가 비어 있을 때) */
@@ -33,30 +33,50 @@ function resolveGrams(
 }
 
 /**
- * 칼로리는 LLM 산수를 신뢰하지 않고 서버에서 재계산
- * 근거값 (100g당 kcal, 환산 그램)이 없으면 LLM 값으로 폴백
+ * 이번 주 AI 추정값에서 기억해 둘 값
+ * - 100g당 열량 (정수로 저장하므로 반올림)
+ * - 1개(1인분) 무게: 개수로 말했을 때만, g/ml로 말했으면 1개 무게를 알 수 없음
  */
-function resolveCalories(item: {
-  caloriesPer100g?: number;
+export function estimateOf(item: {
+  unit?: string;
+  quantity?: number;
   gramsEstimate?: number;
-  calories?: number;
-}): number | undefined {
-  const { caloriesPer100g, gramsEstimate } = item;
-  if (
-    typeof caloriesPer100g === 'number' &&
-    typeof gramsEstimate === 'number' &&
-    caloriesPer100g >= 0 &&
-    gramsEstimate > 0
-  ) {
-    return Math.round((caloriesPer100g * gramsEstimate) / 100);
+  caloriesPer100g?: number;
+}): FoodEstimate | null {
+  const { unit, quantity, gramsEstimate, caloriesPer100g } = item;
+  if (typeof caloriesPer100g !== 'number' || caloriesPer100g < 0) return null;
+
+  const byCount = unit !== 'g' && unit !== 'ml';
+  const qty = typeof quantity === 'number' && quantity > 0 ? quantity : 1;
+  const gramsPerServing =
+    byCount && typeof gramsEstimate === 'number' && gramsEstimate > 0
+      ? Math.round(gramsEstimate / qty)
+      : null;
+
+  return { caloriesPer100g: Math.round(caloriesPer100g), gramsPerServing };
+}
+
+/** 이번 요청에서 처음 추정한 음식들 (식약처 값도, 기억해 둔 추정값도 없는 이름) */
+export function newEstimates(
+  items: DietItem[],
+  table: Map<string, FoodNutrition>,
+  estimates: Map<string, FoodEstimate>,
+): Map<string, FoodEstimate> {
+  const fresh = new Map<string, FoodEstimate>();
+  for (const item of items) {
+    const key = normalizeFoodName(item.name);
+    if (table.has(key) || estimates.has(key) || fresh.has(key)) continue;
+    const guess = estimateOf(item);
+    if (guess) fresh.set(key, guess);
   }
-  return item.calories;
+  return fresh;
 }
 
 /**
- * 칼로리 = 100g당 열량 x 무게
- * - DB(식약처 값)에 있으면 열량은 공식 값, 무게까지 근거가 있을 때만 확정
- * - DB에 없거나 무게를 정할 수 없으면 LLM 근거값으로 재계산 폴백
+ * 칼로리 = 100g 당 열량 x 무게
+ * 1) 식약처 값이 있으면 그 열량, 무게까지 근거가 있을 때만 확정
+ * 2) 없으면 기억해 둔 추정값, 그것도 없으면 이번 AI 추정값, 항상 '추정'
+ * 3) 열량이나 무게를 정할 수 없으면 AI가 준 총칼로리를 그대로
  */
 export function groundCalories(
   item: {
@@ -64,20 +84,31 @@ export function groundCalories(
     unit?: string;
     quantity?: number;
     gramsEstimate?: number;
-    caloriesPerr100g?: number;
+    caloriesPer100g?: number;
     calories?: number;
     estimated: boolean;
   },
   table: Map<string, FoodNutrition>,
+  estimates: Map<string, FoodEstimate> = new Map(),
 ): { calories?: number; grams?: number; estimated: boolean } {
-  const hit = table.get(normalizeFoodName(item.name));
-  const weight = hit ? resolveGrams(item, hit.gramsPerServing) : null;
-
-  if (hit && weight) {
+  const key = normalizeFoodName(item.name);
+  const hit = table.get(key);
+  const official = hit ? resolveGrams(item, hit.gramsPerServing) : null;
+  if (hit && official) {
     return {
-      calories: Math.round((hit.caloriesPer100g * weight.grams) / 100),
+      calories: Math.round((hit.caloriesPer100g * official.grams) / 100),
+      grams: Math.round(official.grams),
+      estimated: !official.grounded,
+    };
+  }
+
+  const guess = hit ? null : (estimates.get(key) ?? estimateOf(item));
+  const weight = guess ? resolveGrams(item, guess.gramsPerServing) : null;
+  if (guess && weight) {
+    return {
+      calories: Math.round((guess.caloriesPer100g * weight.grams) / 100),
       grams: Math.round(weight.grams),
-      estimated: !weight.grounded,
+      estimated: true,
     };
   }
 
@@ -86,7 +117,7 @@ export function groundCalories(
       ? Math.round(item.gramsEstimate)
       : undefined;
 
-  return { calories: resolveCalories(item), grams, estimated: item.estimated };
+  return { calories: item.calories, grams, estimated: item.estimated };
 }
 
 /** 소모 칼로리 = MET x 3.5 x 체중(kg) / 200 x 분 */
@@ -121,8 +152,12 @@ export function toMealType(raw: string | null | undefined): MealType | undefined
 }
 
 /** 파생된 식단 아이템 -> Prisma DietItem 입력값 */
-export function toDietItemInput(item: DietItem, table: Map<string, FoodNutrition>) {
-  const grounded = groundCalories(item, table);
+export function toDietItemInput(
+  item: DietItem,
+  table: Map<string, FoodNutrition>,
+  estimates: Map<string, FoodEstimate> = new Map(),
+) {
+  const grounded = groundCalories(item, table, estimates);
   return {
     name: item.name,
     mealType: toMealType(item.mealType),
