@@ -9,6 +9,9 @@ export function normalizeFoodName(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, '');
 }
 
+/** 식약처에 없는 음식에 처음 쓴 AI 추정값 (같은 음식이 기록마다 다른 칼로리가 되지 않게) */
+export type FoodEstimate = { caloriesPer100g: number; gramsPerServing: number | null };
+
 /** 식약처에서 못 찾은 이름을 다시 묻지 않는 기간 */
 const MISS_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -54,6 +57,50 @@ export class NutritionService {
       if (row) table.set(key, row);
     }
     return table;
+  }
+
+  /**
+   * 식약처에 없는 음식에 처음 쓴 추정값 (정규화 이름 -> 값)
+   * 기억해 둔 값이 없으면 Map에 없음
+   */
+  async findEstimates(names: string[]): Promise<Map<string, FoodEstimate>> {
+    const keys = [...new Set(names.map(normalizeFoodName))].filter(Boolean);
+    if (keys.length === 0) return new Map();
+
+    const rows = await this.prisma.foodLookupMiss.findMany({
+      where: { name: { in: keys }, caloriesPer100g: { not: null } },
+      select: { name: true, caloriesPer100g: true, gramsPerServing: true },
+    });
+
+    const estimates = new Map<string, FoodEstimate>();
+    for (const row of rows) {
+      if (row.caloriesPer100g === null) continue;
+      estimates.set(row.name, {
+        caloriesPer100g: row.caloriesPer100g,
+        gramsPerServing: row.gramsPerServing,
+      });
+    }
+    return estimates;
+  }
+
+  /**
+   * 처음 쓴 추정값을 기억함
+   * - 식약처에서 못 찾았다고 기록된 이름에만, 아직 값이 없을 때만 채움 (처음 값이 이김)
+   * - 실패해도 던지지 않음 (기록 저장을 막으면 안됨)
+   */
+  async rememberEstimates(estimates: Map<string, FoodEstimate>): Promise<void> {
+    try {
+      await Promise.all(
+        [...estimates].map(([name, estimate]) =>
+          this.prisma.foodLookupMiss.updateMany({
+            where: { name, caloriesPer100g: null },
+            data: estimate,
+          }),
+        ),
+      );
+    } catch (e) {
+      this.logger.warn(`추정값 저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   /** 최근에 못 찾은 이름은 다시 묻지 않음. 식약처에 물어볼 이름만 돌려준다 */

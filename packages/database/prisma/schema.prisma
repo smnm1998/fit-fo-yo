@@ -131,12 +131,15 @@ model FoodNutrition {
 
 /// 식약처에서 못 찾은 이름 — 같은 이름으로 API 를 반복 호출하지 않기 위한 기록
 model FoodLookupMiss {
-  name         String               @id // 정규화된 이름
-  reason       FoodLookupMissReason
-  requestCount Int                  @default(1) // 몇 번 요청됐나 → 먼저 채울 음식 우선순위
-  checkedAt    DateTime             @default(now()) // 마지막으로 식약처에 물어본 시각 (재조회 기준)
-  updatedAt    DateTime             @updatedAt
+  name            String               @id // 정규화된 이름
+  reason          FoodLookupMissReason
+  requestCount    Int                  @default(1) // 몇 번 요청됐나 → 먼저 채울 음식 우선순위
+  caloriesPer100g Int? // 처음 쓴 AI 추정값: 100g당 kcal (같은 음식이 기록마다 달라지지 않게)
+  gramsPerServing Int? // 처음 쓴 AI 추정값: 1개(1인분) 무게, 개수로 말했을 때만
+  checkedAt       DateTime             @default(now()) // 마지막으로 식약처에 물어본 시각 (재조회 기준)
+  updatedAt       DateTime             @updatedAt
 }
+
 
 enum FoodLookupMissReason {
   NOT_FOUND // 세 데이터셋 모두 0건
