@@ -12,7 +12,7 @@ export const signupSchema = z
     email: z.email('유효한 이메일을 입력하세요.').max(100, '이메일은 100자 이하여야 합니다.'),
     password: z
       .string()
-      .regex(/^(?=.*[A-Za-z])(?=.*\d).{8,30}$/, '영문과 숫자를 포함해 8–30자로 입력하세요.'),
+      .regex(/^(?=.*[A-Za-z])(?=.*\d).{8,30}$/u, '영문과 숫자를 포함해 8–30자로 입력하세요.'),
     passwordConfirm: z.string(),
     nickname: z
       .string()

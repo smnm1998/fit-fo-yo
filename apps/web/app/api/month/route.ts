@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET(req: Request) {
   const month = new URL(req.url).searchParams.get('month') ?? '';
-  if (!/^\d{4}-\d{2}$/.test(month)) {
+  if (!/^\d{4}-\d{2}$/u.test(month)) {
     return NextResponse.json({ message: '잘못된 month 형식' }, { status: 400 });
   }
 

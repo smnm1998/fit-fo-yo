@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 const isProd = process.env.NODE_ENV === 'production';
 const APP_HOME = '/dashboard';
 const AUTH_ROUTES = ['/login', '/signup'];
-const PROTECTED_PREFIXES = ['/dashboard', '/calendar', '/record'];
+const PROTECTED_PREFIXES = ['/dashboard', '/calendar', '/stats', '/chat'];
 
 type Tokens = { accessToken: string; refreshToken: string };
 
@@ -12,7 +12,7 @@ function isExpired(token: string): boolean {
   try {
     const payload = token.split('.')[1];
     if (!payload) return true;
-    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as {
+    const json = JSON.parse(atob(payload.replace(/-/gu, '+').replace(/_/gu, '/'))) as {
       exp?: number;
     };
     if (!json.exp) return true;
@@ -49,7 +49,7 @@ function setAuthCookies(res: NextResponse, tokens: Tokens): void {
     httpOnly: true,
     secure: isProd,
     sameSite: 'lax',
-    path: '/api/auth/refresh',
+    path: '/',
     maxAge: 7 * 24 * 60 * 60,
   });
 }
@@ -89,15 +89,18 @@ export async function proxy(req: NextRequest) {
   return res;
 }
 
+/** proxy가 도는 경로 = 갱신이 필요한 페이지 + 클라이언트가 부르는 BFF 라우트. 페이지·라우트를 추가하면 여기도 추가 */
 export const config = {
   matcher: [
+    '/',
     '/login',
     '/signup',
     '/dashboard/:path*',
     '/calendar/:path*',
     '/stats/:path*',
-    '/record/:path*',
+    '/chat/:path*',
 
+    '/api/month',
     '/api/records/:path*',
     '/api/health-profile/:path*',
     '/api/ai/:path*',

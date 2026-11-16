@@ -17,9 +17,4 @@ export class RecommendationCron {
     this.logger.log('일일 추천 정산 시작');
     await this.recommendation.runForAllUsers(new Date());
   }
-
-  /** 수동 트리거 (개발/긴급) */
-  async runManually(forDate?: Date) {
-    return this.recommendation.runForAllUsers(forDate ?? new Date());
-  }
 }
