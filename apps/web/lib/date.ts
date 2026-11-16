@@ -52,6 +52,13 @@ export function dayKeyKST(iso: string): string {
   return formatInTimeZone(d, TZ, 'yyyy-MM-dd');
 }
 
+/** 'YYYY-MM-DD' 형식이면서 달력에 실제로 있는 날짜인지 (URL 쿼리 검증용) */
+export function isDayKey(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const noon = new Date(`${value}T12:00:00+09:00`);
+  return !Number.isNaN(noon.getTime()) && dayKeyKST(noon.toISOString()) === value;
+}
+
 /** 'YYYY-MM' -> 6주 달력 그리드용 'YYYY-MM-DD' 배열 */
 export function monthGridKST(month: string): string[] {
   const midMonthUtc = new Date(`${month}-15T00:00:00Z`);

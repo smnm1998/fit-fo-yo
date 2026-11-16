@@ -3,6 +3,7 @@ import { apiFetchAuth } from '@/lib/server/api';
 import { getCurrentUser } from '@/lib/server/user';
 import {
   currentMonthKST,
+  isDayKey,
   monthRangeKST,
   todayKST,
   todayWeekIndexKST,
@@ -38,8 +39,8 @@ export default async function DashboardPage({
   searchParams: Promise<{ month?: string; date?: string }>;
 }) {
   const sp = await searchParams;
-  const month = sp.month && /^\d{4}-\d{2}$/.test(sp.month) ? sp.month : currentMonthKST();
-  const date = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : todayKST();
+  const month = sp.month && /^\d{4}-\d{2}$/u.test(sp.month) ? sp.month : currentMonthKST();
+  const date = isDayKey(sp.date) ? sp.date : todayKST();
 
   const monthRange = monthRangeKST(month);
   const weekRange = weekRangeAgoKST(0);
