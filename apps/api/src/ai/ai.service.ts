@@ -1,67 +1,41 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { Prisma, RecordType, type MealType } from '@fitfoyo/database';
-import { PrismaService } from '../prisma/prisma.service';
-import { RecordsService } from '../records/records.service';
 import { OpenAIClient } from './openai.client';
 import { PARSE_RECORD_SYSTEM_PROMPT } from './prompts/parse-record.system';
 import {
   PARSE_RECORD_TOOLS,
-  CHAT_AGENT_TOOLS,
   type ParsedDietPayload,
   type ParsedExercisePayload,
   type ParsedResult,
-  type UpdateRecordPayload,
-  type DeleteRecordPayload,
 } from './schemas/function-schemas';
-import { NutritionService } from '../nutrition/nutrition.service';
-import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions';
-import { CHAT_AGENT_SYSTEM_PROMPT } from './prompts/chat-agent.system';
-import { UpdateRecordDto } from '../records/dto/update-record.dto';
-import { HealthProfileService } from '../health-profile/health-profile.service';
-import {
-  DEFAULT_WEIGHT_KG,
-  newEstimates,
-  toDietItemInput,
-  toExerciseItemInput,
-  toMealType,
-} from './calorie.calculator';
-import { planDiet } from './diet.planner';
+import { DEFAULT_WEIGHT_KG } from './calorie.calculator';
+import { GuestQuotaService } from './guest-quota.service';
+import { RecordWriter } from './record.writer';
+import { buildDateContext } from './day-context';
+import { parseToolArgs, resolveRecordedAt } from './tool-args';
 
-/** 게스트 AI 사용 상한 (체험용). 초과 시 회원가입 유도. */
-const GUEST_AI_LIMIT = 10;
-
-const MEAL_LABEL: Record<MealType, string> = {
-  BREAKFAST: '아침',
-  LUNCH: '점심',
-  DINNER: '저녁',
-  SNACK: '간식',
-};
-
+/** 한 문장 -> 한 번에 기록 (모델이 식단/운동/도메인 밖으로 분류하고, 서버가 칼로리를 계산해 저장) */
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
 
   constructor(
     private readonly openai: OpenAIClient,
-    private readonly records: RecordsService,
-    private readonly nutrition: NutritionService,
-    private readonly prisma: PrismaService,
-    private readonly healthProfile: HealthProfileService,
+    private readonly writer: RecordWriter,
+    private readonly quota: GuestQuotaService,
   ) {}
 
   /**
-   * 순수 파싱 — LLM 호출 + tool_call 분류만. 저장 없음.
-   * 병렬 tool call 지원: 식단+운동이 함께 오면 결과가 2개.
+   * 순수 파싱 - LLM 호출 + tool_call 분류만 (저장 x)
+   * 병렬 tool call 지원: 식단+운동이 함께 오면 결과가 2개
    */
   async parse(rawInput: string, recordedAt?: string): Promise<ParsedResult[]> {
     const response = await this.openai.chatWithTools({
-      system: `${PARSE_RECORD_SYSTEM_PROMPT}\n\n${this.buildDateContext(recordedAt)}`,
+      system: `${PARSE_RECORD_SYSTEM_PROMPT}\n\n${buildDateContext(recordedAt)}`,
       user: rawInput,
       tools: PARSE_RECORD_TOOLS,
       toolChoice: 'required',
@@ -70,7 +44,7 @@ export class AiService {
     const results: ParsedResult[] = [];
     for (const toolCall of response.choices[0]?.message.tool_calls ?? []) {
       if (toolCall.type !== 'function') continue;
-      const args = this.safeParseJson(toolCall.function.arguments);
+      const args = parseToolArgs(toolCall.function.arguments);
       switch (toolCall.function.name) {
         case 'record_diet':
           results.push({ kind: 'diet', payload: args as ParsedDietPayload });
@@ -100,7 +74,7 @@ export class AiService {
 
   /**
    * 파싱 + Records 저장. 컨트롤러에서 호출하는 메인 진입점.
-   * 식단+운동이 함께면 각각 저장 -> 생성된 레코드 배열 반환
+   * 식단 + 운동이 함께면 각각 저장, 생성된 레코드 배열 반환
    */
   async parseAndSave(params: {
     userId: string;
@@ -108,9 +82,10 @@ export class AiService {
     rawInput: string;
     fallbackRecordedAt?: string;
   }) {
-    await this.assertGuestQuota({ id: params.userId, isGuest: params.isGuest });
+    const user = { id: params.userId, isGuest: params.isGuest };
+    await this.quota.assertAvailable(user);
     const results = await this.parse(params.rawInput, params.fallbackRecordedAt);
-    await this.bumpGuestUsage({ id: params.userId, isGuest: params.isGuest });
+    await this.quota.consume(user);
     const valid = results.filter(
       (r): r is Extract<ParsedResult, { kind: 'diet' | 'exercise' }> => r.kind !== 'invalid_domain',
     );
@@ -127,18 +102,15 @@ export class AiService {
     }
 
     const weightKg = valid.some((r) => r.kind === 'exercise')
-      ? await this.loadWeightKg(params.userId)
+      ? await this.writer.loadWeightKg(params.userId)
       : DEFAULT_WEIGHT_KG;
 
     return Promise.all(
       valid.map((parsed) => {
-        const recordedAt = this.resolveRecordedAt(
-          parsed.payload.recordedAt,
-          params.fallbackRecordedAt,
-        );
+        const recordedAt = resolveRecordedAt(parsed.payload.recordedAt, params.fallbackRecordedAt);
         return parsed.kind === 'diet'
-          ? this.createDiet(params.userId, parsed.payload, recordedAt, params.rawInput)
-          : this.createExercise(
+          ? this.writer.createDiet(params.userId, parsed.payload, recordedAt, params.rawInput)
+          : this.writer.createExercise(
               params.userId,
               parsed.payload,
               recordedAt,
@@ -147,402 +119,5 @@ export class AiService {
             );
       }),
     );
-  }
-
-  /** 게스트 AI 사용 상한 가드. 회원(isGuest=false/undefined)은 no-op. */
-  private async assertGuestQuota(user: { id: string; isGuest?: boolean }) {
-    if (!user.isGuest) return;
-    const row = await this.prisma.user.findUnique({
-      where: { id: user.id },
-      select: { aiUsageCount: true },
-    });
-    if ((row?.aiUsageCount ?? 0) >= GUEST_AI_LIMIT) {
-      throw new ForbiddenException(
-        `게스트는 AI를 ${GUEST_AI_LIMIT}회까지 체험할 수 있어요. 회원가입하면 계속 사용할 수 있어요.`,
-      );
-    }
-  }
-
-  /** 게스트만 사용 횟수 +1 (회원은 no-op). */
-  private async bumpGuestUsage(user: { id: string; isGuest?: boolean }) {
-    if (!user.isGuest) return;
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { aiUsageCount: { increment: 1 } },
-    });
-  }
-
-  private async createDiet(
-    userId: string,
-    payload: ParsedDietPayload,
-    recordedAt: Date,
-    rawInput: string,
-  ) {
-    return this.records.createFromParsed({
-      userId,
-      type: RecordType.DIET,
-      rawInput,
-      parsedJson: payload as unknown as Prisma.InputJsonValue,
-      recordedAt,
-      dietItems: await this.toDietItems(payload.items),
-    });
-  }
-
-  /**
-   * 식단 항목 -> 저장한 값
-   * 식약처 값 -> 기억해 둔 추정값 -> 이번 AI 추정값 순서로 계산하고, 처음 본 추정값은 기억해 둠
-   * (같은 음식이 대화 맥락에 따라 기록마다 다른 칼로리가 되지 않게)
-   */
-  private async toDietItems(items: ParsedDietPayload['items']) {
-    const names = items.map((i) => i.name);
-    const [table, estimates] = await Promise.all([
-      this.nutrition.lookupMany(names),
-      this.nutrition.findEstimates(names),
-    ]);
-    await this.nutrition.rememberEstimates(newEstimates(items, table, estimates));
-    return items.map((item) => toDietItemInput(item, table, estimates));
-  }
-
-  private async createExercise(
-    userId: string,
-    payload: ParsedExercisePayload,
-    recordedAt: Date,
-    rawInput: string,
-    weightKg: number,
-  ) {
-    return this.records.createFromParsed({
-      userId,
-      type: RecordType.EXERCISE,
-      rawInput,
-      parsedJson: payload as unknown as Prisma.InputJsonValue,
-      recordedAt,
-      exerciseItems: payload.items.map((item) => toExerciseItemInput(item, weightKg)),
-    });
-  }
-
-  private async updateRecord(userId: string, payload: UpdateRecordPayload) {
-    const dto: UpdateRecordDto = {};
-
-    if (payload.recordedAt) dto.recordedAt = payload.recordedAt;
-    if (payload.dietItems) {
-      const table = await this.nutrition.lookupMany(payload.dietItems.map((i) => i.name));
-      dto.dietItems = payload.dietItems.map((item) => toDietItemInput(item, table));
-    }
-    if (payload.dietItems) {
-      dto.dietItems = await this.toDietItems(payload.dietItems);
-    }
-
-    return this.records.update(userId, payload.recordId, dto);
-  }
-
-  private safeParseJson(raw: string): unknown {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      throw new InternalServerErrorException('AI 응답 JSON 파싱 실패');
-    }
-  }
-
-  private async loadWeightKg(userId: string): Promise<number> {
-    const profile = await this.healthProfile.get(userId);
-    const weight = profile?.weightKg;
-    return typeof weight === 'number' && weight > 0 ? weight : DEFAULT_WEIGHT_KG;
-  }
-
-  private resolveRecordedAt(fromAi: string | undefined, fallback: string | undefined): Date {
-    if (fromAi) return new Date(fromAi);
-    if (fallback) return new Date(fallback);
-    return new Date();
-  }
-
-  // ───────── 대화형 에이전트 ─────────
-
-  async chat(params: {
-    userId: string;
-    isGuest?: boolean;
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
-    recordedAt?: string;
-  }) {
-    const { userId, recordedAt } = params;
-    await this.assertGuestQuota({ id: userId, isGuest: params.isGuest });
-    const history = params.messages.slice(-12);
-    const lastUser = [...history].reverse().find((m) => m.role === 'user')?.content ?? '';
-
-    // 1) 이 날의 기록 컨텍스트(id 포함)
-    const { from, to } = this.dayRange(recordedAt);
-    const { items: dayRecords } = await this.records.findAll(userId, {
-      from: from.toISOString(),
-      to: to.toISOString(),
-      limit: 50,
-      offset: 0,
-    });
-    const systemContent = [
-      CHAT_AGENT_SYSTEM_PROMPT,
-      this.buildDateContext(recordedAt),
-      this.buildDayContext(dayRecords),
-    ].join('\n\n');
-    const historyParams: ChatCompletionMessageParam[] = history.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    // 2) pass 1 — 툴 결정
-    const first = await this.openai.chat({
-      messages: [{ role: 'system', content: systemContent }, ...historyParams],
-      tools: CHAT_AGENT_TOOLS,
-      toolChoice: 'auto',
-      temperature: 0.2,
-    });
-    await this.bumpGuestUsage({ id: userId, isGuest: params.isGuest }); // 첫 호출 성공 → 이 턴 1회 카운트
-
-    const assistantMsg = first.choices[0]?.message;
-    const functionCalls = (assistantMsg?.tool_calls ?? []).filter((c) => c.type === 'function');
-
-    // 3) 툴 디스패치 → mutations
-    const mutations = {
-      created: [] as Awaited<ReturnType<RecordsService['createFromParsed']>>[],
-      updated: [] as Awaited<ReturnType<RecordsService['update']>>[],
-      deletedIds: [] as string[],
-    };
-    const toolResults: ChatCompletionMessageParam[] = [];
-
-    // 운동 관련 툴이 나올 때만, 그리고 한 턴에 한 번만 조회
-    let cachedWeight: number | null = null;
-    const weight = async (): Promise<number> => (cachedWeight ??= await this.loadWeightKg(userId));
-
-    for (const call of functionCalls) {
-      this.logger.debug(`tool ${call.function.name} ${call.function.arguments}`);
-
-      const args = this.safeParseJson(call.function.arguments);
-      let summary: string;
-      try {
-        switch (call.function.name) {
-          case 'record_diet': {
-            const payload = args as ParsedDietPayload;
-            const outcome = await this.recordDiet(
-              userId,
-              payload,
-              this.resolveRecordedAt(payload.recordedAt, recordedAt),
-              lastUser,
-            );
-            if (outcome.created) mutations.created.push(outcome.created);
-            if (outcome.updated) mutations.updated.push(outcome.updated);
-            summary = outcome.summary;
-            break;
-          }
-          case 'record_exercise': {
-            const payload = args as ParsedExercisePayload;
-            const rec = await this.createExercise(
-              userId,
-              payload,
-              this.resolveRecordedAt(payload.recordedAt, recordedAt),
-              lastUser,
-              await weight(),
-            );
-            mutations.created.push(rec);
-            summary = `운동 등록 완료 (id=${rec.id})`;
-            break;
-          }
-          case 'update_record': {
-            const rec = await this.updateRecord(userId, args as UpdateRecordPayload);
-            mutations.updated.push(rec);
-            summary = `수정 완료 (id=${rec.id})`;
-            break;
-          }
-          case 'delete_record': {
-            const { recordId } = args as DeleteRecordPayload;
-            await this.records.remove(userId, recordId);
-            mutations.deletedIds.push(recordId);
-            summary = `삭제 완료 (id=${recordId})`;
-            break;
-          }
-          default:
-            summary = `알 수 없는 작업: ${call.function.name}`;
-        }
-      } catch (err) {
-        summary = `실패: ${err instanceof Error ? err.message : String(err)}`;
-      }
-      toolResults.push({ role: 'tool', tool_call_id: call.id, content: summary });
-    }
-
-    // 4) pass 2 — 자연어 응답 + 추천 질문(JSON)
-    const finalize =
-      '지금까지의 대화와 작업 결과를 바탕으로 사용자에게 한국어로 짧고 친근하게 답하세요. ' +
-      'suggestions는 "사용자가 다음에 그대로 타이핑해 보낼 문구"를 사용자 1인칭 시점으로 2~3개 제안하세요. ' +
-      '(예: "저녁도 기록할래", "물 2잔 마셨어", "오늘 총 칼로리 알려줘") ' +
-      '봇이 사용자에게 되묻는 질문이 아니라, 사용자가 입력할 프롬프트여야 합니다. ' +
-      '작업 결과에 "이미 기록돼 있어 넣지 않은 항목"이 있으면, 그 음식이 사용자가 이번에 말한 음식일 때만 ' +
-      '이미 기록돼 있다고 알리고 한 번 더 추가할지 물으세요(이때 suggestions 첫 번째는 "응, 한 번 더 추가해줘"). ' +
-      '사용자가 이번에 말하지 않은 음식이면 언급하지 마세요. ' +
-      '반드시 JSON만 출력: {"reply": string, "suggestions": string[]}';
-
-    const pass2: ChatCompletionMessageParam[] = [
-      { role: 'system', content: `${systemContent}\n\n${finalize}` },
-      ...historyParams,
-    ];
-    if (functionCalls.length > 0 && assistantMsg) {
-      pass2.push(
-        { role: 'assistant', content: assistantMsg.content ?? '', tool_calls: functionCalls },
-        ...toolResults,
-      );
-    }
-    const second = await this.openai.chat({
-      messages: pass2,
-      responseFormat: { type: 'json_object' },
-      temperature: 0.6,
-    });
-
-    return { ...this.parseFinalize(second.choices[0]?.message.content), mutations };
-  }
-
-  /**
-   * 채팅의 식단 기록. 그 날의 식단과 대조한 뒤 처리한다 (planDiet)
-   * - 새 기록 만들기 / 같은 끼니 기록에 덧붙이기 / 전부 이미 있으면 기록하지 않기
-   * summary 는 2차 응답을 만드는 모델이 읽는다
-   */
-  private async recordDiet(
-    userId: string,
-    payload: ParsedDietPayload,
-    recordedAt: Date,
-    rawInput: string,
-  ): Promise<{
-    summary: string;
-    created?: Awaited<ReturnType<RecordsService['createFromParsed']>>;
-    updated?: Awaited<ReturnType<RecordsService['appendDietItems']>>;
-  }> {
-    const { from, to } = this.dayRange(recordedAt.toISOString());
-    const { items: day } = await this.records.findAll(userId, {
-      type: RecordType.DIET,
-      from: from.toISOString(),
-      to: to.toISOString(),
-      limit: 50,
-      offset: 0,
-    });
-
-    // 'NONE' 같은 값을 먼저 정리해야 끼니 비교가 맞는다
-    const items = payload.items.map((item) => ({ ...item, mealType: toMealType(item.mealType) }));
-    const plan = planDiet(day, items, payload.again === true);
-
-    const skipped = plan.skipped.length
-      ? ` 이미 기록돼 있어 넣지 않은 항목: ${plan.skipped.join(', ')}`
-      : '';
-
-    switch (plan.kind) {
-      case 'SKIP':
-        return { summary: skipped ? `기록하지 않음.${skipped}` : '기록할 음식이 없음' };
-      case 'APPEND': {
-        const rec = await this.records.appendDietItems(
-          userId,
-          plan.recordId,
-          await this.toDietItems(plan.items),
-          rawInput,
-        );
-        const names = plan.items.map((i) => i.name).join(', ');
-        return {
-          updated: rec,
-          summary: `기존 식단 기록에 추가 완료 (id=${rec.id}): ${names}.${skipped}`,
-        };
-      }
-
-      case 'CREATE': {
-        const rec = await this.createDiet(
-          userId,
-          { ...payload, items: plan.items },
-          recordedAt,
-          rawInput,
-        );
-        return { created: rec, summary: `식단 등록 완료 (id=${rec.id}).${skipped}` };
-      }
-    }
-  }
-
-  private parseFinalize(content: string | null | undefined): {
-    reply: string;
-    suggestions: string[];
-  } {
-    const fallback = { reply: '처리했어요. 더 도와드릴까요?', suggestions: [] as string[] };
-    if (!content) return fallback;
-    try {
-      const json = JSON.parse(content) as { reply?: unknown; suggestions?: unknown };
-      const reply =
-        typeof json.reply === 'string' && json.reply.trim() ? json.reply.trim() : fallback.reply;
-      const suggestions = Array.isArray(json.suggestions)
-        ? json.suggestions.filter((s): s is string => typeof s === 'string').slice(0, 3)
-        : [];
-      return { reply, suggestions };
-    } catch {
-      return fallback;
-    }
-  }
-
-  /**
-   * KST 기준 'YYYY-MM-DD (요일)'
-   * dayRange와 같은 방식(UTC에 +9h)으로 계산해 두 곳의 날짜 해석이 어긋나지 않게 한다.
-   */
-  private kstDateLabel(date: Date): string {
-    const KST = 9 * 60 * 60 * 1000;
-    const k = new Date(date.getTime() + KST);
-    const y = k.getUTCFullYear();
-    const m = String(k.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(k.getUTCDate()).padStart(2, '0');
-    const dow = ['일', '월', '화', '수', '목', '금', '토'][k.getUTCDay()];
-    return `${y}-${m}-${d} (${dow})`;
-  }
-
-  /**
-   * 모델에게 기준일을 줌
-   * 이게 없으면 "어제"를 계산할 근거가 없어 recordedAt을 생략하고,
-   * 결국 사용자가 보고 있던 날짜에 저장됨
-   */
-  private buildDateContext(recordedAt?: string): string {
-    const now = new Date();
-    return [
-      `오늘 (KST): ${this.kstDateLabel(now)}`,
-      `사용자가 캘린더에서 보고 있는 날짜: ${this.kstDateLabel(recordedAt ? new Date(recordedAt) : now)}`,
-      '',
-      '날짜 규칙:',
-      '- 날짜 언급이 없으면 recordedAt 을 생략하세요. 서버가 "보고 있는 날짜" 로 저장합니다.',
-      '- "어제 · 그저께 · 지난 화요일" 처럼 상대 표현이 나오면 위 "오늘 (KST)" 를 기준으로',
-      '  계산해 recordedAt 을 ISO8601 로 채우세요.',
-      '- 시각이 명시되지 않았으면 그 날 12:00 (KST) = 03:00Z 로 잡으세요.',
-    ].join('\n');
-  }
-
-  private dayRange(recordedAt?: string): { from: Date; to: Date } {
-    const KST = 9 * 60 * 60 * 1000;
-    const base = recordedAt ? new Date(recordedAt) : new Date();
-    const k = new Date(base.getTime() + KST);
-    const y = k.getUTCFullYear();
-    const m = k.getUTCMonth();
-    const d = k.getUTCDate();
-    return {
-      from: new Date(Date.UTC(y, m, d, 0, 0, 0, 0) - KST),
-      to: new Date(Date.UTC(y, m, d, 23, 59, 59, 999) - KST),
-    };
-  }
-
-  private buildDayContext(
-    records: Awaited<ReturnType<RecordsService['findAll']>>['items'],
-  ): string {
-    if (records.length === 0) return '이 날의 기록: (아직 없음)';
-    const lines = records.map((r) => {
-      if (r.type === RecordType.DIET) {
-        const meal = r.dietItems.find((d) => d.mealType)?.mealType;
-        const mealLabel = meal ? MEAL_LABEL[meal] : '끼니 미지정';
-        const items = r.dietItems
-          .map((d) => {
-            const amount = d.quantity != null && d.unit ? ` ${d.quantity}${d.unit}` : '';
-            const kcal = d.calories != null ? ` ${d.calories}kcal` : '';
-            return `${d.name}${amount}${kcal}`;
-          })
-          .join(', ');
-        return `- id=${r.id} | 식단 | ${mealLabel} | ${items || '항목 없음'}`;
-      }
-      const items = r.exerciseItems
-        .map((e) => `${e.name}${e.durationMinutes != null ? ` ${e.durationMinutes}분` : ''}`)
-        .join(', ');
-      return `- id=${r.id} | 운동 | ${items || '항목 없음'}`;
-    });
-    return ['이 날의 기록 (수정/삭제 시 아래 id 사용):', ...lines].join('\n');
   }
 }

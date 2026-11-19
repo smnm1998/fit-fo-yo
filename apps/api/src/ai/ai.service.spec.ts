@@ -2,6 +2,9 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { RecordType } from '@fitfoyo/database';
 import { AiService } from './ai.service';
+import { ChatAgentService } from './chat-agent.service';
+import { GuestQuotaService } from './guest-quota.service';
+import { RecordWriter } from './record.writer';
 import { OpenAIClient } from './openai.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
@@ -23,6 +26,7 @@ function toolCallResponse(name: string, args: unknown) {
 
 describe('AiService', () => {
   let service: AiService;
+  let chatAgent: ChatAgentService;
   let openai: { chatWithTools: jest.Mock; chat: jest.Mock };
   let records: { createFromParsed: jest.Mock; findAll: jest.Mock; appendDietItems: jest.Mock };
   let nutrition: { lookupMany: jest.Mock; findEstimates: jest.Mock; rememberEstimates: jest.Mock };
@@ -48,6 +52,9 @@ describe('AiService', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         AiService,
+        ChatAgentService,
+        RecordWriter,
+        GuestQuotaService,
         { provide: OpenAIClient, useValue: openai },
         { provide: RecordsService, useValue: records },
         { provide: NutritionService, useValue: nutrition },
@@ -60,6 +67,7 @@ describe('AiService', () => {
     }).compile();
 
     service = moduleRef.get(AiService);
+    chatAgent = moduleRef.get(ChatAgentService);
   });
 
   describe('날짜 컨텍스트', () => {
@@ -474,7 +482,10 @@ describe('AiService', () => {
     }
 
     function say(content: string) {
-      return service.chat({ userId: 'u1', messages: [{ role: 'user', content }] });
+      return chatAgent.chat({
+        userId: 'u1',
+        messages: [{ role: 'user', content }],
+      });
     }
 
     it('같은 음식을 다시 말하면 기록하지 않고, 이미 있다는 사실을 2차 응답에 넘긴다.', async () => {
