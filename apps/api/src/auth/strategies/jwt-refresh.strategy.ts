@@ -3,32 +3,20 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import type { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PasswordService } from '../password.service';
-
-type RefreshUserSummary = {
-  id: string;
-  refreshTokenHash: string | null;
-  isGuest: boolean;
-};
-
-type RefreshValidateResult = {
-  id: string;
-  isGuest: boolean;
-  refreshToken: string;
-};
 
 export type RefreshTokenPayload = {
   sub: string;
 };
 
+export type RefreshRequestUser = {
+  id: string;
+  refreshToken: string;
+};
+
+/** 서명, 만료만 검증하고 원본 토큰을 넘긴다. 저장된 해시와 대조·회전은 AuthService가 한다 */
 @Injectable()
 export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(
-    config: ConfigService,
-    private readonly prisma: PrismaService,
-    private readonly password: PasswordService,
-  ) {
+  constructor(config: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request): string | null => {
@@ -43,7 +31,7 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
     });
   }
 
-  async validate(req: Request, payload: RefreshTokenPayload): Promise<RefreshValidateResult> {
+  validate(req: Request, payload: RefreshTokenPayload): RefreshRequestUser {
     const authHeader = req.headers.authorization;
     const refreshToken =
       (req.cookies?.refresh_token as string | undefined) ??
@@ -51,24 +39,6 @@ export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh'
 
     if (!refreshToken) throw new UnauthorizedException();
 
-    const user = (await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, refreshTokenHash: true, isGuest: true },
-    })) as RefreshUserSummary | null;
-
-    if (!user?.refreshTokenHash) {
-      throw new UnauthorizedException('Token revoked');
-    }
-
-    const isValid = await this.password.compare(refreshToken, user.refreshTokenHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Token mismatch');
-    }
-
-    return {
-      id: user.id,
-      isGuest: user.isGuest,
-      refreshToken,
-    };
+    return { id: payload.sub, refreshToken };
   }
 }

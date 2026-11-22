@@ -22,13 +22,15 @@ function isExpired(token: string): boolean {
   }
 }
 
-async function tryRefresh(refreshToken: string): Promise<Tokens | null> {
+/** 'rejected' = api가 토큰을 거부(401/403), null = 일시 장애(5xx, 네트워크)라 쿠키 유지 */
+async function tryRefresh(refreshToken: string): Promise<Tokens | 'rejected' | null> {
   try {
     const res = await fetch(`${process.env.API_URL}/auth/refresh`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${refreshToken}` },
       cache: 'no-store',
     });
+    if (res.status === 401 || res.status === 403) return 'rejected';
     if (!res.ok) return null;
     const { tokens } = (await res.json()) as { tokens: Tokens };
     return tokens;
@@ -60,10 +62,10 @@ export async function proxy(req: NextRequest) {
   const refresh = req.cookies.get('refresh_token')?.value;
 
   // 1) access 만료/부재 + refresh 있으면 먼저 갱신 (가드보다 앞서야 로그인으로 안 튕김)
-  let refreshed: Tokens | null = null;
+  let refreshed: Tokens | 'rejected' | null = null;
   if ((!access || isExpired(access)) && refresh) {
     refreshed = await tryRefresh(refresh);
-    if (refreshed) {
+    if (refreshed && refreshed !== 'rejected') {
       access = refreshed.accessToken;
       req.cookies.set('access_token', refreshed.accessToken); // 현재 요청 다운스트림용
     }
@@ -84,7 +86,9 @@ export async function proxy(req: NextRequest) {
   }
 
   // 3) 갱신했으면 어떤 응답(리다이렉트/통과)이든 새 쿠키 심기
-  if (refreshed) setAuthCookies(res, refreshed);
+  // 거부된 refresh 쿠키는 지움 (남겨 두면 요청마다 실패할 갱신을 다시 시도)
+  if (refreshed === 'rejected') res.cookies.delete('refresh_token');
+  else if (refreshed) setAuthCookies(res, refreshed);
 
   return res;
 }

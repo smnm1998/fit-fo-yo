@@ -4,7 +4,6 @@ import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { CurrentUser, type AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { AiService } from './ai.service';
 import { ChatAgentService } from './chat-agent.service';
-
 import { ParseInputDto } from './dto/parse-input.dto';
 import { ChatDto } from './dto/chat.dto';
 
