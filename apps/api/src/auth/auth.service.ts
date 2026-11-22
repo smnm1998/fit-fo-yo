@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { User } from '@fitfoyo/database';
 import type { StringValue } from '../common/duration';
 import { PrismaService } from '../prisma/prisma.service';
+import { createHash, randomUUID } from 'node:crypto';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { PasswordService } from './password.service';
@@ -21,9 +22,24 @@ export type AuthResult = {
   tokens: AuthTokens;
 };
 
+/** 같은 refresh 토큰으로 이 시간 안에 다시 오면 방금 발급한 토큰을 그대로 돌려줌 (동시 갱신 대비) */
+const REFRESH_GRACE_MS = 10_000;
+
+type RecentRefresh = { userId: string; result: Promise<AuthTokens>; expiresAt: number };
+
+/**
+ * refresh 토큰은 서버가 만든 고엔트로피 값이라 느린 해시가 필요 없음
+ * bcrypt는 72바이트 넘으면 잘림
+ */
+function sha256(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  /** 키 = 갱신에 쓰인 refresh 토큰의 해시. 인스턴스 1개 전제 (여러 대면 공유 저장소 필요) */
+  private readonly recentRefreshes = new Map<string, RecentRefresh>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -96,16 +112,30 @@ export class AuthService {
   }
 
   // Refresh
-  async refresh(userId: string, isGuest: boolean): Promise<AuthTokens> {
-    const tokens = await this.issueTokens(userId, isGuest);
-    await this.persistRefreshHash(userId, tokens.refreshToken);
-    return tokens;
+  refresh(userId: string, refreshToken: string): Promise<AuthTokens> {
+    const key = sha256(refreshToken);
+    const now = Date.now();
+    for (const [k, v] of this.recentRefreshes) {
+      if (v.expiresAt <= now) this.recentRefreshes.delete(k);
+    }
+
+    const recent = this.recentRefreshes.get(key);
+    if (recent) return recent.result;
+
+    const result = this.rotate(userId, key);
+    this.recentRefreshes.set(key, { userId, result, expiresAt: now + REFRESH_GRACE_MS });
+    result.catch(() => this.recentRefreshes.delete(key));
+    return result;
   }
 
   // 로그아웃
-  async logout(userId: string): Promise<void> {
-    await this.prisma.user.update({
-      where: { id: userId },
+  async logout(userId: string, refreshToken: string): Promise<void> {
+    for (const [k, v] of this.recentRefreshes) {
+      if (v.userId === userId) this.recentRefreshes.delete(k);
+    }
+
+    await this.prisma.user.updateMany({
+      where: { id: userId, refreshTokenHash: sha256(refreshToken) },
       data: { refreshTokenHash: null },
     });
   }
@@ -171,8 +201,9 @@ export class AuthService {
   // 헬퍼: 토큰 발급
   private async issueTokens(userId: string, isGuest: boolean): Promise<AuthTokens> {
     const accessToken = await this.jwt.signAsync({ sub: userId, isGuest });
+    // jti: 같은 초에 발급해도 토큰이 달라지게 (JWT는 payload가 같으면 같은 문자열)
     const refreshToken = await this.jwt.signAsync(
-      { sub: userId },
+      { sub: userId, jti: randomUUID() },
       {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
         expiresIn: (this.config.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '7d') as StringValue,
@@ -182,13 +213,29 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  // 헬퍼: DB에 refresh hash 저장
+  // 헬퍼: DB에 refresh hash 저장 (로그인·가입·게스트·OAuth = 새 세션)
   private async persistRefreshHash(userId: string, refreshToken: string): Promise<void> {
-    const hash = await this.password.hash(refreshToken);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { refreshTokenHash: hash },
+      data: { refreshTokenHash: sha256(refreshToken) },
     });
+  }
+
+  /** 저장된 해시가 낸 토큰의 해시일 때만 새 해시로 바꾼다 — 조건부 UPDATE 한 번이라 비교와 교체가 원자적 */
+  private async rotate(userId: string, presentedHash: string): Promise<AuthTokens> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isGuest: true },
+    });
+    if (!user) throw new UnauthorizedException('Token revoked');
+
+    const tokens = await this.issueTokens(userId, user.isGuest);
+    const { count } = await this.prisma.user.updateMany({
+      where: { id: userId, refreshTokenHash: presentedHash },
+      data: { refreshTokenHash: sha256(tokens.refreshToken) },
+    });
+    if (count === 0) throw new UnauthorizedException('Token revoked');
+    return tokens;
   }
 
   /** /auth/me 전용 — 가드가 더는 프로필을 싣지 않으므로 여기서 조회 */

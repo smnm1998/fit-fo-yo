@@ -192,7 +192,7 @@ LLM에게 칼로리를 직접 답하게 하면 브랜드·가공식품에서 크
 
 **3. 인증 — Refresh 토큰 회전 + BFF 쿠키**
 
-Access/Refresh **토큰 회전(rotation)** 기반으로 재인증하며, Refresh 해시를 `bcrypt.compare`로 매치합니다. 토큰은 클라이언트 스토리지가 아니라 **`HttpOnly`·`Secure` 쿠키**로 BFF 계층에서 발급·갱신합니다. Google OAuth를 연동했고, 크로스도메인 쿠키 핸드오프 문제를 처리했습니다.
+Access/Refresh **토큰 회전(rotation)** 기반으로 재인증합니다. Refresh 토큰은 SHA-256 해시로 저장하고, 저장된 해시와 낸 토큰이 일치할 때만 새 해시로 바꾸는 조건부 UPDATE 한 번으로 회전합니다. 같은 토큰으로 동시에 온 갱신 요청에는 10초 동안 같은 새 토큰을 돌려주고, 그 뒤 옛 토큰은 거부합니다. 토큰은 클라이언트 스토리지가 아니라 **`HttpOnly`·`Secure` 쿠키**로 BFF 계층에서 발급하며, access가 만료되면 Next proxy가 페이지 요청 전에 갱신합니다. Google OAuth를 연동했고, 크로스도메인 쿠키 핸드오프 문제를 처리했습니다.
 
 **4. 비용·보안 방어**
 

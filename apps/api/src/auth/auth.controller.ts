@@ -24,8 +24,7 @@ import { JwtAccessGuard } from './guards/jwt-access.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import type { GoogleAuthUser } from './strategies/google.strategy';
-
-type RefreshRequestUser = { id: string; isGuest: boolean; refreshToken: string };
+import type { RefreshRequestUser } from './strategies/jwt-refresh.strategy';
 
 @Controller('auth')
 export class AuthController {
@@ -109,21 +108,20 @@ export class AuthController {
     @Req() req: Request & { user: RefreshRequestUser },
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ tokens: AuthTokens }> {
-    const { id, isGuest } = req.user;
-    const tokens = await this.auth.refresh(id, isGuest);
+    const tokens = await this.auth.refresh(req.user.id, req.user.refreshToken);
     this.setAuthCookies(res, tokens);
     return { tokens };
   }
 
-  // 로그아웃
+  // 로그아웃 — access가 만료돼도 되도록 refresh 토큰으로 식별
   @Post('logout')
-  @UseGuards(JwtAccessGuard)
+  @UseGuards(JwtRefreshGuard)
   @HttpCode(HttpStatus.OK)
   async logout(
-    @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request & { user: RefreshRequestUser },
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ ok: true }> {
-    await this.auth.logout(user.id);
+    await this.auth.logout(req.user.id, req.user.refreshToken);
     this.clearAuthCookies(res);
     return { ok: true };
   }
