@@ -10,9 +10,11 @@ import { DeleteConfirm } from '@/components/ui/DeleteConfirm';
 
 import type { RecordDto } from '@/lib/types';
 import { POPOVER_SURFACE } from '@/components/ui/surface';
+import type { ChipDragBindings } from './useRecordDrag';
 
 const STYLES = {
-  chip: 'pointer-events-auto block w-full truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight transition-colors',
+  chip: 'pointer-events-auto block w-full select-none truncate rounded px-1 py-0.5 text-left text-[11px] leading-tight transition-colors',
+  dragging: 'opacity-40',
   content: `relative z-50 flex max-h-[70vh] w-64 flex-col gap-2 overflow-y-auto p-3 ${POPOVER_SURFACE}`,
   arrow: 'fill-surface',
   head: 'flex items-center gap-1.5',
@@ -24,7 +26,15 @@ const STYLES = {
   itemMetric: 'shrink-0 tabular-nums text-muted',
 } as const;
 
-export function RecordChip({ record, weekday }: { record: RecordDto; weekday: number }) {
+export function RecordChip({
+  record,
+  weekday,
+  drag,
+}: {
+  record: RecordDto;
+  weekday: number;
+  drag?: ChipDragBindings;
+}) {
   const [confirming, setConfirming] = useState(false);
   const deleteOne = useDeleteRecord();
   const meta = RECORD_TYPE_META[record.type];
@@ -33,8 +43,12 @@ export function RecordChip({ record, weekday }: { record: RecordDto; weekday: nu
 
   return (
     <Popover.Root onOpenChange={(open) => !open && setConfirming(false)}>
-      <Popover.Trigger asChild>
-        <button type="button" className={cn(STYLES.chip, meta.chip)}>
+      <Popover.Trigger asChild onClick={drag?.onClick}>
+        <button
+          type="button"
+          className={cn(STYLES.chip, meta.chip, drag?.draggingId === record.id && STYLES.dragging)}
+          onPointerDown={drag ? (e) => drag.onPointerDown(e, record) : undefined}
+        >
           {recordName(record)}
         </button>
       </Popover.Trigger>

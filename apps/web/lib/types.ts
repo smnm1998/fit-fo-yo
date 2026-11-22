@@ -3,11 +3,17 @@ export type ApiUser = {
   email?: string | null;
   nickname?: string | null;
   isGuest: boolean;
+  createdAt: string;
 };
 
 export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
+};
+
+export type AuthResponse = {
+  user: ApiUser;
+  tokens: AuthTokens;
 };
 
 export type DietItem = {

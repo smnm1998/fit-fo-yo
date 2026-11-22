@@ -3,9 +3,9 @@
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Modal } from '@/components/ui/Modal';
-import { RECORD_TYPE_META } from '@/lib/record-meta';
 import type { RecordDto } from '@/lib/types';
-import { MEAL_ORDER, MEAL_TAB_LABEL } from './record-info/record-info-utils';
+import { MEAL_TAB_LABEL } from './record-info/record-info-utils';
+import { RECORD_TYPE_META, MEAL_ORDER } from '@/lib/record-meta';
 import { RecordCard } from './record-info/RecordCard';
 import { Salad, Activity, CircleAlert } from 'lucide-react';
 

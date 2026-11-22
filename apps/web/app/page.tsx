@@ -156,7 +156,7 @@ export default async function Home() {
                 </GuestDemoButton>
               </div>
               <p className="mt-3 text-xs text-muted">
-                가입 없이 체험 · 게스트 데이터는 24시간 후 자동 삭제
+                가입 없이 5분 체험 · 게스트 데이터는 24시간 후 자동 삭제
               </p>
             </Reveal>
           </div>

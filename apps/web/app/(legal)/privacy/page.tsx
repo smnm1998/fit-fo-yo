@@ -71,7 +71,7 @@ export default function PrivacyPage() {
 
       <section className={STYLES.section}>
         <h2 className={STYLES.h2}>6. 문의</h2>
-        <p className={STYLES.p}>개인정보 관련 문의: {'{{smnm9812@gmail.com}}'}</p>
+        <p className={STYLES.p}>개인정보 관련 문의: smnm9812@gmail.com</p>
       </section>
     </article>
   );

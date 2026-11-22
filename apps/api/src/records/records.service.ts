@@ -81,15 +81,18 @@ export class RecordsService {
         : {}),
     };
 
-    const items = await this.prisma.record.findMany({
-      where,
-      orderBy: { recordedAt: 'desc' },
-      take: query.limit,
-      skip: query.offset,
-      include: { dietItems: true, exerciseItems: true },
-    });
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.record.findMany({
+        where,
+        orderBy: { recordedAt: 'desc' },
+        take: query.limit,
+        skip: query.offset,
+        include: { dietItems: true, exerciseItems: true },
+      }),
+      this.prisma.record.count({ where }),
+    ]);
 
-    return { items, total: items.length, limit: query.limit, offset: query.offset };
+    return { items, total, limit: query.limit, offset: query.offset };
   }
 
   async findOne(userId: string, id: string) {
@@ -127,6 +130,31 @@ export class RecordsService {
         },
         include: { dietItems: true, exerciseItems: true },
       });
+    });
+  }
+
+  /**
+   * 기존 식단 기록에 음식을 덧붙임
+   * update와 달리 기존 항목을 지우지 않음
+   */
+  async appendDietItems(
+    userId: string,
+    id: string,
+    items: Prisma.DietItemCreateWithoutRecordInput[],
+    rawInput?: string,
+  ) {
+    const existing = await this.findOne(userId, id);
+    if (existing.type !== RecordType.DIET) {
+      throw new BadRequestException('식단 기록에만 음식을 덧붙일 수 있습니다.');
+    }
+
+    return this.prisma.record.update({
+      where: { id },
+      data: {
+        dietItems: { create: items },
+        ...(rawInput ? { rawInput: [existing.rawInput, rawInput].filter(Boolean).join('\n') } : {}),
+      },
+      include: { dietItems: true, exerciseItems: true },
     });
   }
 

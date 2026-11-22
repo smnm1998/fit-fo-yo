@@ -1,7 +1,6 @@
 import type { RecordDto, DietItem, ExerciseItem } from '@/lib/types';
 import type { UpdateRecordInput, CreateRecordInput } from '@/lib/client/records-api';
 
-export const MEAL_ORDER = ['BREAKFAST', 'LUNCH', 'DINNER', 'SNACK', 'ETC'] as const;
 export const MEAL_TAB_LABEL: Record<string, string> = {
   BREAKFAST: '아침',
   LUNCH: '점심',

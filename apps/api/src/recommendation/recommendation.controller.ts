@@ -1,17 +1,12 @@
-import { Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
-import { JwtAccessGuard } from 'src/auth/guards/jwt-access.guard';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { RecommendationService } from './recommendation.service';
-import { RecommendationCron } from './recommendation.cron';
-import { Throttle } from '@nestjs/throttler';
-import { type AuthenticatedUser, CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { type AuthenticatedUser, CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @UseGuards(JwtAccessGuard)
 @Controller('recommendations')
 export class RecommendationController {
-  constructor(
-    private readonly recommendation: RecommendationService,
-    private readonly cron: RecommendationCron,
-  ) {}
+  constructor(private readonly recommendation: RecommendationService) {}
 
   /** 오늘 추천 1건 */
   @Get('today')
@@ -19,7 +14,7 @@ export class RecommendationController {
     return this.recommendation.getForDate(user.id, this.todayDateOnly());
   }
 
-  /** 기간 조회 (캘린더 뷰용) */
+  /** 기간 조회 */
   @Get()
   getRange(
     @CurrentUser() user: AuthenticatedUser,
@@ -27,20 +22,6 @@ export class RecommendationController {
     @Query('to') to: string,
   ) {
     return this.recommendation.getRange(user.id, new Date(from), new Date(to));
-  }
-
-  @Post('run-now')
-  @HttpCode(HttpStatus.OK)
-  runNow() {
-    return this.cron.runManually();
-  }
-
-  /** 현재 유저의 오늘 추천 즉시 생성(어제 기록 기반), 게스트 포함, runForAllUsers 우회 */
-  @Post('generate')
-  @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
-  generate(@CurrentUser() user: AuthenticatedUser) {
-    return this.recommendation.generateForUser(user.id, this.todayDateOnly());
   }
 
   /** forDate는 @db.Date라서 시각 제거한 00:00 UTC로 정규화 */

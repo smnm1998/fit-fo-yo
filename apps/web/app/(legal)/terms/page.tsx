@@ -39,6 +39,7 @@ export default function TermsPage() {
         <ul className={STYLES.ul}>
           <li>이메일 또는 Google 계정으로 가입하며, 계정 관리 책임은 이용자에게 있습니다.</li>
           <li>게스트 모드로 생성된 데이터는 24시간이 지나면 자동으로 삭제됩니다.</li>
+          <li>게스트 세션은 발급 후 5분이 지나면 종료됩니다.</li>
         </ul>
       </section>
 
@@ -61,9 +62,7 @@ export default function TermsPage() {
 
       <section className={STYLES.section}>
         <h2 className={STYLES.h2}>제6조 (준거법 및 문의)</h2>
-        <p className={STYLES.p}>
-          본 약관은 대한민국 법률에 따릅니다. 문의: {'{{smnm9812@gmail.com}}'}
-        </p>
+        <p className={STYLES.p}>본 약관은 대한민국 법률에 따릅니다. 문의: smnm9812@gmail.com</p>
       </section>
     </article>
   );

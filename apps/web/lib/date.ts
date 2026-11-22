@@ -52,6 +52,13 @@ export function dayKeyKST(iso: string): string {
   return formatInTimeZone(d, TZ, 'yyyy-MM-dd');
 }
 
+/** 'YYYY-MM-DD' 형식이면서 달력에 실제로 있는 날짜인지 (URL 쿼리 검증용) */
+export function isDayKey(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) return false;
+  const noon = new Date(`${value}T12:00:00+09:00`);
+  return !Number.isNaN(noon.getTime()) && dayKeyKST(noon.toISOString()) === value;
+}
+
 /** 'YYYY-MM' -> 6주 달력 그리드용 'YYYY-MM-DD' 배열 */
 export function monthGridKST(month: string): string[] {
   const midMonthUtc = new Date(`${month}-15T00:00:00Z`);
@@ -111,6 +118,15 @@ export function dayNoonIsoKST(dayKey: string): string {
   return new Date(`${dayKey}T12:00:00+09:00`).toISOString();
 }
 
+/**
+ * UTC ISO의 KST 시각은 유지하고 날짜만 dayKey('YYYY-MM-DD')로 바꿈 (기록/날짜 이동용)
+ * 예) 9/10 08:30 KST(= 9/9 23:30Z)를 9/12로 -> 9/12 08:30 KST(= 9/11 23:30Z)
+ */
+export function moveToDayKST(iso: string, dayKey: string): string {
+  const time = formatInTimeZone(new Date(iso), TZ, 'HH:mm:ss.SSS');
+  return new Date(`${dayKey}T${time}+09:00`).toISOString();
+}
+
 /** 지난 주(8~14일 전 구간) 'YYYY-MM-DD' 배열 — 전주 비교용 (이번 주와 겹치지 않음) */
 export function prevWeekDayKeysKST(days = 7): string[] {
   const end = startOfDay(toZonedTime(new Date(), TZ));
@@ -135,4 +151,9 @@ export function weekRangeAgoKST(weeksAgo = 0): { from: string; to: string } {
   const from = fromZonedTime(startOfDay(start), TZ).toISOString();
   const to = fromZonedTime(endOfDay(end), TZ).toISOString();
   return { from, to };
+}
+
+/** 이번 주 (일=0 ... 토=6)에서 오늘이 몇 번째 칸인지 - 스트릭 강조용 */
+export function todayWeekIndexKST(): number {
+  return Number(formatInTimeZone(new Date(), TZ, 'i')) % 7;
 }

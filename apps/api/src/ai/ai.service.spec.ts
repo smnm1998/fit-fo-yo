@@ -2,10 +2,14 @@ import { Test } from '@nestjs/testing';
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { RecordType } from '@fitfoyo/database';
 import { AiService } from './ai.service';
+import { ChatAgentService } from './chat-agent.service';
+import { GuestQuotaService } from './guest-quota.service';
+import { RecordWriter } from './record.writer';
 import { OpenAIClient } from './openai.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecordsService } from '../records/records.service';
 import { NutritionService } from '../nutrition/nutrition.service';
+import { HealthProfileService } from '../health-profile/health-profile.service';
 
 /** OpenAI chat.completions tool_call 응답을 흉내내는 헬퍼 */
 function toolCallResponse(name: string, args: unknown) {
@@ -22,19 +26,35 @@ function toolCallResponse(name: string, args: unknown) {
 
 describe('AiService', () => {
   let service: AiService;
-  let openai: { chatWithTools: jest.Mock };
-  let records: { createFromParsed: jest.Mock };
-  let nutrition: { lookupMany: jest.Mock };
+  let chatAgent: ChatAgentService;
+  let openai: { chatWithTools: jest.Mock; chat: jest.Mock };
+  let records: { createFromParsed: jest.Mock; findAll: jest.Mock; appendDietItems: jest.Mock };
+  let nutrition: { lookupMany: jest.Mock; findEstimates: jest.Mock; rememberEstimates: jest.Mock };
+  let healthProfile: { get: jest.Mock };
 
   beforeEach(async () => {
-    openai = { chatWithTools: jest.fn() };
-    records = { createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })) };
-    // 기본: 시드 미등록(빈 Map) → LLM 재계산 폴백. 등록 케이스는 테스트마다 override.
-    nutrition = { lookupMany: jest.fn().mockResolvedValue(new Map()) };
+    openai = { chatWithTools: jest.fn(), chat: jest.fn() };
+    records = {
+      createFromParsed: jest.fn((x) => Promise.resolve({ id: 'rec_1', ...x })),
+      findAll: jest.fn().mockResolvedValue({ items: [] }),
+      appendDietItems: jest.fn((_userId, id, items) =>
+        Promise.resolve({ id, dietItems: items, exerciseItems: [] }),
+      ),
+    };
+
+    nutrition = {
+      lookupMany: jest.fn().mockResolvedValue(new Map()),
+      findEstimates: jest.fn().mockResolvedValue(new Map()),
+      rememberEstimates: jest.fn().mockResolvedValue(undefined),
+    };
+    healthProfile = { get: jest.fn().mockResolvedValue(null) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         AiService,
+        ChatAgentService,
+        RecordWriter,
+        GuestQuotaService,
         { provide: OpenAIClient, useValue: openai },
         { provide: RecordsService, useValue: records },
         { provide: NutritionService, useValue: nutrition },
@@ -42,10 +62,104 @@ describe('AiService', () => {
           provide: PrismaService,
           useValue: { user: { findUnique: jest.fn(), update: jest.fn() } },
         },
+        { provide: HealthProfileService, useValue: healthProfile },
       ],
     }).compile();
 
     service = moduleRef.get(AiService);
+    chatAgent = moduleRef.get(ChatAgentService);
+  });
+
+  describe('날짜 컨텍스트', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ now: new Date('2026-09-12T01:00:00.000Z') });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    function systemPrompt(): string {
+      const arg = openai.chatWithTools.mock.calls[0]?.[0] as { system: string };
+      return arg.system;
+    }
+
+    it('오늘 보고 있는 날짜를 KST로 시스템 프롬프트에 싣는다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_exercise', {
+          items: [{ name: '조깅', durationMinutes: 30, met: 7, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({
+        userId: 'u1',
+        rawInput: '어제 30분 조깅',
+        fallbackRecordedAt: '2026-09-10T03:00:00.000Z',
+      });
+
+      expect(systemPrompt()).toContain('오늘 (KST): 2026-09-12 (토)');
+      expect(systemPrompt()).toContain('보고 있는 날짜: 2026-09-10 (목)');
+    });
+
+    it('선택 날짜가 없으면 보고 있는 날짜도 오늘로 채운다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [{ name: '비빔밥', calories: 600, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '비빔밥' });
+
+      expect(systemPrompt()).toContain('오늘 (KST): 2026-09-12 (토)');
+      expect(systemPrompt()).toContain('보고 있는 날짜: 2026-09-12 (토)');
+    });
+  });
+
+  describe('운동 소모 칼로리 - 체중 반영', () => {
+    function joggingCall() {
+      return toolCallResponse('record_exercise', {
+        items: [
+          { name: '조깅', durationMinutes: 30, met: 7, caloriesBurned: 9999, estimated: true },
+        ],
+      });
+    }
+
+    function savedCaloriesBurned(): number | undefined {
+      const arg = records.createFromParsed.mock.calls[0]?.[0] as {
+        exerciseItems: { caloriesBurned?: number };
+      };
+      return arg.exerciseItems[0]?.caloriesBurned;
+    }
+
+    it('프로필 체중이 있으면 그 체중으로 계산한다.', async () => {
+      healthProfile.get.mockResolvedValue({ weightKg: 70 });
+      openai.chatWithTools.mockResolvedValue(joggingCall());
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '30분 조깅' });
+
+      expect(savedCaloriesBurned()).toBe(257);
+    });
+
+    it('프로필이 없으면 기본 체중 65kg으로 게산한다.', async () => {
+      healthProfile.get.mockResolvedValue(null);
+      openai.chatWithTools.mockResolvedValue(joggingCall());
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '30분 조깅' });
+
+      expect(savedCaloriesBurned()).toBe(239);
+    });
+
+    it('식단만 있으면 프로필을 조회하지 않는다', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [{ name: '비빔밥', calories: 600, estimated: true }],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '비빔밥' });
+
+      expect(healthProfile.get).not.toHaveBeenCalled();
+    });
   });
 
   describe('parse', () => {
@@ -183,7 +297,15 @@ describe('AiService', () => {
       // 실제 시드값: 불닭볶음면 { caloriesPer100g: 408, gramsPerServing: 130 }
       nutrition.lookupMany.mockResolvedValue(
         new Map([
-          ['불닭볶음면', { name: '불닭볶음면', caloriesPer100g: 408, gramsPerServing: 130 }],
+          [
+            '불닭볶음면',
+            {
+              name: '불닭볶음면',
+              foodCd: 'P108-009000400-0210',
+              caloriesPer100g: 379,
+              gramsPerServing: 140,
+            },
+          ],
         ]),
       );
       openai.chatWithTools.mockResolvedValue(
@@ -206,15 +328,26 @@ describe('AiService', () => {
 
       const arg = records.createFromParsed.mock.calls[0][0];
       expect(arg.dietItems[0].calories).toBe(1061);
-      expect(arg.dietItems[0].grams).toBe(260); // 2공기 × 130g
+      expect(arg.dietItems[0].grams).toBe(280); // 2봉 × 140g
       expect(arg.dietItems[0].estimated).toBe(false);
     });
 
     it('등록 음식을 g/ml 로 주면 사용자 그램수 × DB 밀도 로 계산한다', async () => {
-      // 실제 시드값: 닭가슴살 { caloriesPer100g: 165, gramsPerServing: 100 }
+      // 식약처 원재료 R209-008000546-0000 닭고기_가슴(껍질 제거)_삶은것: 127kcal/100g
       nutrition.lookupMany.mockResolvedValue(
-        new Map([['닭가슴살', { name: '닭가슴살', caloriesPer100g: 165, gramsPerServing: 100 }]]),
+        new Map([
+          [
+            '닭가슴살',
+            {
+              name: '닭가슴살',
+              foodCd: 'R209-008000546-0000',
+              caloriesPer100g: 127,
+              gramsPerServing: null,
+            },
+          ],
+        ]),
       );
+
       openai.chatWithTools.mockResolvedValue(
         toolCallResponse('record_diet', {
           items: [
@@ -223,7 +356,7 @@ describe('AiService', () => {
               quantity: 200,
               unit: 'g',
               gramsEstimate: 200, // 무게 직접 지정 → g 분기에서 신뢰
-              caloriesPer100g: 999, // LLM 값은 무시, DB 165 사용
+              caloriesPer100g: 999, // LLM 값은 무시, DB 127 사용
               calories: 1998,
               estimated: true,
             },
@@ -234,8 +367,237 @@ describe('AiService', () => {
       await service.parseAndSave({ userId: 'u1', rawInput: '닭가슴살 200g' });
 
       const arg = records.createFromParsed.mock.calls[0][0];
-      expect(arg.dietItems[0].calories).toBe(330); // 165 × 200 / 100
+      expect(arg.dietItems[0].calories).toBe(254); // 127 × 200 / 100
       expect(arg.dietItems[0].estimated).toBe(false);
+    });
+
+    it('식약처에 없는 음식은 기억해 둔 추정값으로 계산한다. (대화 맥락이 달라도 같은 칼로리)', async () => {
+      nutrition.findEstimates.mockResolvedValue(
+        new Map([['서브웨이폴드포크30cm', { caloriesPer100g: 250, gramsPerServing: 300 }]]),
+      );
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '서브웨이 폴드포크 30cm',
+              quantity: 1,
+              unit: '개',
+              gramsEstimate: 300,
+              caloriesPer100g: 333, // 이번 맥락에서 AI 가 다르게 추정한 값
+              calories: 999,
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({
+        userId: 'u1',
+        rawInput: '저녁에도 서브웨이 폴드포크 30cm 먹음',
+      });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(750); // 250 × 300 / 100
+      expect(arg.dietItems[0].estimated).toBe(true);
+      expect(nutrition.rememberEstimates).toHaveBeenCalledWith(new Map());
+    });
+
+    it('처음 보는 음식은 이번 추정값으로 계산하고 기억해 둔다.', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [
+            {
+              name: '엽기떡볶이',
+              quantity: 1,
+              unit: '인분',
+              gramsEstimate: 400,
+              caloriesPer100g: 150,
+              calories: 600,
+              estimated: true,
+            },
+          ],
+        }),
+      );
+
+      await service.parseAndSave({ userId: 'u1', rawInput: '엽기떡볶이 1인분 먹음' });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.dietItems[0].calories).toBe(600);
+      expect(nutrition.rememberEstimates).toHaveBeenCalledWith(
+        new Map([['엽기떡볶이', { caloriesPer100g: 150, gramsPerServing: 400 }]]),
+      );
+    });
+  });
+
+  describe('chat - 식단을 기록하기 전에 그 날 기록과 대조한다', () => {
+    /** 이미 저장된 식단 기록 (records.findAll 이 돌려주는 모양) */
+    function savedDiet(
+      id: string,
+      mealType: string | null,
+      ...items: Array<{ name: string; quantity?: number; unit?: string; calories?: number }>
+    ) {
+      return {
+        id,
+        type: RecordType.DIET,
+        dietItems: items.map((item) => ({ ...item, mealType })),
+        exerciseItems: [],
+      };
+    }
+
+    /** 1차 호출은 record_diet 툴 호출, 2차 호출은 JSON 응답을 돌려주게 한다 */
+    function mockRecordDiet(args: unknown) {
+      openai.chat
+        .mockResolvedValueOnce({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_1',
+                    type: 'function',
+                    function: { name: 'record_diet', arguments: JSON.stringify(args) },
+                  },
+                ],
+              },
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+        });
+    }
+
+    /** n번째 openai.chat 호출에 넘어간 메시지들 */
+    function sentMessages(call: number): Array<{ role: string; content: string }> {
+      const arg = openai.chat.mock.calls[call]?.[0] as {
+        messages: Array<{ role: string; content: string }>;
+      };
+      return arg.messages;
+    }
+
+    /** 2차 응답을 만드는 모델에게 넘어간 툴 실행 결과 */
+    function toolResult(): string {
+      return sentMessages(1).find((m) => m.role === 'tool')?.content ?? '';
+    }
+
+    function say(content: string) {
+      return chatAgent.chat({
+        userId: 'u1',
+        messages: [{ role: 'user', content }],
+      });
+    }
+
+    it('같은 음식을 다시 말하면 기록하지 않고, 이미 있다는 사실을 2차 응답에 넘긴다.', async () => {
+      records.findAll.mockResolvedValue({
+        items: [savedDiet('lunch', 'LUNCH', { name: '불닭볶음면', quantity: 2, unit: '개' })],
+      });
+      mockRecordDiet({
+        items: [
+          { name: '불닭볶음면', mealType: 'LUNCH', quantity: 2, unit: '개', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('불닭볶음면 2개 점심에 먹음');
+
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(records.appendDietItems).not.toHaveBeenCalled();
+      expect(result.mutations.created).toHaveLength(0);
+      expect(toolResult()).toContain('이미 기록돼 있어 넣지 않은 항목: 불닭볶음면');
+    });
+
+    it('again 이면 같은 음식도 한 번 더 기록한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [{ name: '불닭볶음면', quantity: 2, unit: '개', estimated: true }],
+        again: true,
+      });
+
+      const result = await say('응, 한 번 더 추가해줘');
+
+      expect(records.createFromParsed).toHaveBeenCalledTimes(1);
+      expect(result.mutations.created).toHaveLength(1);
+    });
+
+    it('같은 끼니에 더하면 새 기록을 만들지 않고 새 음식만 기존 기록에 붙인다. (샐러드 중복 기록 회귀)', async () => {
+      records.findAll.mockResolvedValue({
+        items: [savedDiet('lunch', 'LUNCH', { name: '닭가슴살 샐러드' })],
+      });
+      // 모델이 끼니 전체를 다시 보낸 상황
+      mockRecordDiet({
+        items: [
+          { name: '닭가슴살 샐러드', mealType: 'LUNCH', estimated: true },
+          { name: '쌀밥', mealType: 'LUNCH', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('점심에 밥도 추가해줘');
+
+      const [userId, recordId, items, rawInput] = records.appendDietItems.mock.calls[0] as [
+        string,
+        string,
+        Array<{ name: string }>,
+        string,
+      ];
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(userId).toBe('u1');
+      expect(recordId).toBe('lunch');
+      expect(items.map((i) => i.name)).toEqual(['쌀밥']);
+      expect(rawInput).toBe('점심에 밥도 추가해줘');
+      expect(result.mutations.updated).toHaveLength(1);
+    });
+
+    it('끼니 없이 기록된 음식이 있어도, 끼니를 말한 같은 음식은 묻지 않고 기록한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [
+          { name: '불닭볶음면', mealType: 'LUNCH', quantity: 2, unit: '개', estimated: true },
+        ],
+        again: false,
+      });
+
+      const result = await say('점심에 불닭 2개 먹음');
+
+      expect(records.createFromParsed).toHaveBeenCalledTimes(1);
+      expect(result.mutations.created).toHaveLength(1);
+    });
+
+    it('모델이 끼니를 NONE 으로 주면 끼니 없이 저장하고, 끼니 없는 같은 음식과 대조한다.', async () => {
+      records.findAll.mockResolvedValue({ items: [savedDiet('r1', null, { name: '불닭볶음면' })] });
+      mockRecordDiet({
+        items: [{ name: '불닭볶음면', mealType: 'NONE', quantity: 2, unit: '개', estimated: true }],
+        again: false,
+      });
+
+      await say('불닭볶음면 2개 먹었어');
+
+      expect(records.createFromParsed).not.toHaveBeenCalled();
+      expect(toolResult()).toContain('이미 기록돼 있어 넣지 않은 항목: 불닭볶음면');
+    });
+
+    it('모델에게 주는 "이 날의 기록"에 끼니와 수량을 싣는다.', async () => {
+      records.findAll.mockResolvedValue({
+        items: [
+          savedDiet('lunch', 'LUNCH', {
+            name: '불닭볶음면',
+            quantity: 2,
+            unit: '개',
+            calories: 1061,
+          }),
+        ],
+      });
+      // 툴 호출 없이 답만 하는 턴
+      openai.chat.mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+      });
+
+      await say('오늘 뭐 먹었지?');
+
+      expect(sentMessages(0)[0]?.content).toContain(
+        '- id=lunch | 식단 | 점심 | 불닭볶음면 2개 1061kcal',
+      );
     });
   });
 });
