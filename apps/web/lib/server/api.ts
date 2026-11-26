@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { ACCESS_COOKIE } from '@/lib/auth-cookie';
 
 const API_URL = process.env.API_URL;
 
@@ -10,7 +11,7 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 
 /** 인증 호출 - 쿠키의 access_token을 Bearer로 부착 */
 export async function apiFetchAuth(path: string, init?: RequestInit): Promise<Response> {
-  const token = (await cookies()).get('access_token')?.value;
+  const token = (await cookies()).get(ACCESS_COOKIE)?.value;
   return fetch(`${API_URL}${path}`, {
     ...init,
     headers: {

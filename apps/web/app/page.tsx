@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Check } from 'lucide-react';
+import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/auth-cookie';
 import { getCurrentUser } from '@/lib/server/user';
 import { TypingTags } from '@/components/marketing/TypingTags';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -85,7 +86,7 @@ function ShotFrame({ src, alt }: { src: string; alt: string }) {
 
 export default async function Home() {
   const jar = await cookies();
-  if (jar.get('access_token') || jar.get('refresh_token')) {
+  if (jar.get(ACCESS_COOKIE) || jar.get(REFRESH_COOKIE)) {
     const user = await getCurrentUser();
     if (user) redirect('/dashboard');
   }
