@@ -5,7 +5,11 @@ import type {
 } from 'openai/resources/chat/completions';
 import { RecordsService } from '../records/records.service';
 import { OpenAIClient } from './openai.client';
-import { CHAT_AGENT_SYSTEM_PROMPT, CHAT_FINALIZE_PROMPT } from './prompts/chat-agent.system';
+import {
+  CHAT_AGENT_SYSTEM_PROMPT,
+  CHAT_FINALIZE_PROMPT,
+  CHAT_REPLY_ROLE_PROMPT,
+} from './prompts/chat-agent.system';
 import {
   CHAT_AGENT_TOOLS,
   type DeleteRecordPayload,
@@ -17,6 +21,7 @@ import { GuestQuotaService } from './guest-quota.service';
 import { RecordWriter } from './record.writer';
 import { buildDateContext, buildDayContext, dayRangeKST } from './day-context';
 import { parseToolArgs, resolveRecordedAt } from './tool-args';
+import { callUsage } from './usage';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
@@ -45,7 +50,6 @@ export class ChatAgentService {
     recordedAt?: string;
   }) {
     const { userId, recordedAt } = params;
-    await this.quota.assertAvailable({ id: userId, isGuest: params.isGuest });
     const history = params.messages.slice(-12);
     const lastUser = [...history].reverse().find((m) => m.role === 'user')?.content ?? '';
 
@@ -57,24 +61,24 @@ export class ChatAgentService {
       limit: 50,
       offset: 0,
     });
-    const systemContent = [
-      CHAT_AGENT_SYSTEM_PROMPT,
-      buildDateContext(recordedAt),
-      buildDayContext(dayRecords),
-    ].join('\n\n');
+    const context = [buildDateContext(recordedAt), buildDayContext(dayRecords)].join('\n\n');
     const historyParams: ChatCompletionMessageParam[] = history.map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
-    // 2) pass 1 - 툴 결정
-    const first = await this.openai.chat({
-      messages: [{ role: 'system', content: systemContent }, ...historyParams],
-      tools: CHAT_AGENT_TOOLS,
-      toolChoice: 'auto',
-      temperature: 0.2,
-    });
-    await this.quota.consume({ id: userId, isGuest: params.isGuest }); // 첫 호출 성공 → 이 턴 1회 카운트
+    // 2) pass 1 - 툴 결정 (게스트는 이 호출이 성공해야 이 턴이 1회로 남음)
+    const first = await this.quota.charge({ id: userId, isGuest: params.isGuest }, () =>
+      this.openai.chat({
+        messages: [
+          { role: 'system', content: `${CHAT_AGENT_SYSTEM_PROMPT}\n\n${context}` },
+          ...historyParams,
+        ],
+        tools: CHAT_AGENT_TOOLS,
+        toolChoice: 'auto',
+        temperature: 0.2,
+      }),
+    );
 
     const assistantMsg = first.choices[0]?.message;
     const functionCalls = (assistantMsg?.tool_calls ?? []).filter((c) => c.type === 'function');
@@ -87,9 +91,12 @@ export class ChatAgentService {
       lastUser,
     );
 
-    // 4) pass 2 - 자연어 응답 + 추천 질문(JSON)
+    // 4) pass 2 - 자연어 응답 + 추천 질문(JSON), 툴 규칙은 빼고 역할 안내만
     const pass2: ChatCompletionMessageParam[] = [
-      { role: 'system', content: `${systemContent}\n\n${CHAT_FINALIZE_PROMPT}` },
+      {
+        role: 'system',
+        content: [CHAT_REPLY_ROLE_PROMPT, context, CHAT_FINALIZE_PROMPT].join('\n\n'),
+      },
       ...historyParams,
     ];
     if (functionCalls.length > 0 && assistantMsg) {
@@ -103,6 +110,15 @@ export class ChatAgentService {
       responseFormat: { type: 'json_object' },
       temperature: 0.6,
     });
+
+    // 비용 측정: 한 턴의 1차·2차 토큰을 한 줄로 (운영 로그에서 턴 단위로 모을 수 있게)
+    this.logger.log(
+      `chat usage ${JSON.stringify({
+        pass1: callUsage(first),
+        pass2: callUsage(second),
+        tools: functionCalls.length,
+      })}`,
+    );
 
     return { ...parseFinalReply(second.choices[0]?.message.content), mutations };
   }
@@ -125,9 +141,10 @@ export class ChatAgentService {
     for (const call of calls) {
       this.logger.debug(`tool ${call.function.name} ${call.function.arguments}`);
 
-      const args = parseToolArgs(call.function.arguments);
       let summary: string;
       try {
+        // 깨진 인자도 이 툴 하나의 실패로 처리 (앞에서 저장한 툴의 결과는 그대로 응답에 남김)
+        const args = parseToolArgs(call.function.arguments);
         switch (call.function.name) {
           case 'record_diet': {
             const payload = args as ParsedDietPayload;

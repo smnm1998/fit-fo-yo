@@ -3,7 +3,6 @@ import {
   AiChatResponseSchema,
   NoContentSchema,
   RecordListSchema,
-  RecordPageSchema,
   RecordSchema,
 } from '@/lib/schemas/api';
 import type { RecordDto, AiChatTurn, AiChatResponse } from '@/lib/types';
@@ -55,12 +54,6 @@ export function parseAndSave(rawInput: string, recordedAt?: string): Promise<Rec
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rawInput, ...(recordedAt ? { recordedAt } : {}) }),
   });
-}
-
-export async function fetchRecords(from: string, to: string, limit = 200): Promise<RecordDto[]> {
-  const qs = new URLSearchParams({ from, to, limit: String(limit) });
-  const data = await request(`/api/records?${qs.toString()}`, RecordPageSchema);
-  return data.items;
 }
 
 export async function deleteRecord(id: string): Promise<void> {
