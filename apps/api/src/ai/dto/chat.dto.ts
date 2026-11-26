@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsDateString,
   IsIn,
   IsOptional,
   IsString,
@@ -26,6 +27,6 @@ export class ChatDto {
   messages!: ChatTurnDto[];
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   recordedAt?: string;
 }

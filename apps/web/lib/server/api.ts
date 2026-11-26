@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { ACCESS_COOKIE } from '@/lib/auth-cookie';
 
 const API_URL = process.env.API_URL;
 
@@ -10,7 +11,7 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 
 /** 인증 호출 - 쿠키의 access_token을 Bearer로 부착 */
 export async function apiFetchAuth(path: string, init?: RequestInit): Promise<Response> {
-  const token = (await cookies()).get('access_token')?.value;
+  const token = (await cookies()).get(ACCESS_COOKIE)?.value;
   return fetch(`${API_URL}${path}`, {
     ...init,
     headers: {
@@ -64,6 +65,23 @@ export function upstreamDown(error: unknown, path: string): NextResponse {
     { message: '서비스에 일시적으로 연결할 수 없습니다. 잠시 후에 다시 시도해 주세요.' },
     { status: 502 },
   );
+}
+
+/**
+ * 요청 본문(JSON) 읽기. 깨진 JSON이면 400 응답을 돌려준다
+ * (req.json()을 그냥 부르면 예외가 라우트 밖으로 나가 500이 된다)
+ */
+export async function readJson(
+  req: Request,
+): Promise<{ ok: true; body: unknown } | { ok: false; response: NextResponse }> {
+  try {
+    return { ok: true, body: await req.json() };
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json({ message: '요청 형식이 올바르지 않습니다.' }, { status: 400 }),
+    };
+  }
 }
 
 /** 인증 프록시 - 가공 없이 그대로 전달하는 라우트용 (try/catch + 파싱 포함) */

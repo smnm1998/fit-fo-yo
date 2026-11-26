@@ -28,7 +28,13 @@ describe('AiService', () => {
   let service: AiService;
   let chatAgent: ChatAgentService;
   let openai: { chatWithTools: jest.Mock; chat: jest.Mock };
-  let records: { createFromParsed: jest.Mock; findAll: jest.Mock; appendDietItems: jest.Mock };
+  let records: {
+    createFromParsed: jest.Mock;
+    findAll: jest.Mock;
+    appendDietItems: jest.Mock;
+    update: jest.Mock;
+    remove: jest.Mock;
+  };
   let nutrition: { lookupMany: jest.Mock; findEstimates: jest.Mock; rememberEstimates: jest.Mock };
   let healthProfile: { get: jest.Mock };
 
@@ -40,6 +46,8 @@ describe('AiService', () => {
       appendDietItems: jest.fn((_userId, id, items) =>
         Promise.resolve({ id, dietItems: items, exerciseItems: [] }),
       ),
+      update: jest.fn(),
+      remove: jest.fn().mockResolvedValue({ ok: true }),
     };
 
     nutrition = {
@@ -60,7 +68,7 @@ describe('AiService', () => {
         { provide: NutritionService, useValue: nutrition },
         {
           provide: PrismaService,
-          useValue: { user: { findUnique: jest.fn(), update: jest.fn() } },
+          useValue: { user: { updateMany: jest.fn() } },
         },
         { provide: HealthProfileService, useValue: healthProfile },
       ],
@@ -259,6 +267,24 @@ describe('AiService', () => {
       await service.parseAndSave({
         userId: 'u1',
         rawInput: '사과',
+        fallbackRecordedAt: '2026-05-31T08:00:00+09:00',
+      });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.recordedAt).toEqual(new Date('2026-05-31T08:00:00+09:00'));
+    });
+
+    it('AI 가 해석할 수 없는 recordedAt 을 주면 fallback 을 사용한다 (Invalid Date 저장 방지)', async () => {
+      openai.chatWithTools.mockResolvedValue(
+        toolCallResponse('record_diet', {
+          items: [{ name: '사과', estimated: true }],
+          recordedAt: '어제 점심',
+        }),
+      );
+
+      await service.parseAndSave({
+        userId: 'u1',
+        rawInput: '어제 점심에 사과',
         fallbackRecordedAt: '2026-05-31T08:00:00+09:00',
       });
 
@@ -598,6 +624,109 @@ describe('AiService', () => {
       expect(sentMessages(0)[0]?.content).toContain(
         '- id=lunch | 식단 | 점심 | 불닭볶음면 2개 1061kcal',
       );
+    });
+
+    it('2차(답변) 호출엔 툴 사용 규칙을 다시 보내지 않고, 역할 안내와 이 날의 기록만 보낸다.', async () => {
+      records.findAll.mockResolvedValue({
+        items: [savedDiet('lunch', 'LUNCH', { name: '불닭볶음면', quantity: 2, unit: '개' })],
+      });
+      openai.chat.mockResolvedValue({
+        choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+      });
+
+      await say('파이썬 코드 짜줘');
+
+      const pass1System = sentMessages(0)[0]?.content ?? '';
+      const pass2System = sentMessages(1)[0]?.content ?? '';
+      expect(pass1System).toContain('record_diet');
+      expect(pass2System).not.toContain('record_diet');
+      expect(pass2System).toContain('도메인 밖');
+      expect(pass2System).toContain('- id=lunch | 식단 | 점심 | 불닭볶음면 2개');
+      expect(pass2System.length).toBeLessThan(pass1System.length);
+    });
+  });
+  describe('chat - 모델 출력이 깨져도 그 툴만 실패로 처리한다', () => {
+    function toolCall(id: string, name: string, args: string) {
+      return { id, type: 'function', function: { name, arguments: args } };
+    }
+
+    function mockTurn(...calls: ReturnType<typeof toolCall>[]) {
+      openai.chat
+        .mockResolvedValueOnce({ choices: [{ message: { content: null, tool_calls: calls } }] })
+        .mockResolvedValueOnce({
+          choices: [{ message: { content: JSON.stringify({ reply: '응답', suggestions: [] }) } }],
+        });
+    }
+
+    /** 2차 호출에 넘어간 툴 결과들 (tool_call_id -> content) */
+    function toolResults(): Record<string, string> {
+      const arg = openai.chat.mock.calls[1]?.[0] as {
+        messages: Array<{ role: string; tool_call_id?: string; content: string }>;
+      };
+      return Object.fromEntries(
+        arg.messages.filter((m) => m.role === 'tool').map((m) => [m.tool_call_id, m.content]),
+      );
+    }
+
+    it('깨진 tool 인자 하나 때문에 턴 전체가 500이 되지 않고, 다른 툴은 실행된다.', async () => {
+      mockTurn(
+        toolCall('call_bad', 'record_diet', '{"items": [{"name": "사과"'),
+        toolCall('call_ok', 'delete_record', JSON.stringify({ recordId: 'r9' })),
+      );
+
+      const result = await chatAgent.chat({
+        userId: 'u1',
+        messages: [{ role: 'user', content: '사과 먹었고 아까 기록은 지워줘' }],
+      });
+
+      expect(records.remove).toHaveBeenCalledWith('u1', 'r9');
+      expect(result.mutations.deletedIds).toEqual(['r9']);
+      expect(result.reply).toBe('응답');
+      expect(toolResults()).toEqual({
+        call_bad: '실패: AI 응답 JSON 파싱 실패',
+        call_ok: '삭제 완료 (id=r9)',
+      });
+    });
+
+    it('모델이 해석할 수 없는 날짜를 주면 사용자가 보고 있던 날짜에 저장한다.', async () => {
+      mockTurn(
+        toolCall(
+          'call_1',
+          'record_diet',
+          JSON.stringify({
+            items: [{ name: '사과', mealType: 'SNACK', estimated: true }],
+            recordedAt: '2026-13-45',
+            again: false,
+          }),
+        ),
+      );
+
+      await chatAgent.chat({
+        userId: 'u1',
+        messages: [{ role: 'user', content: '간식으로 사과' }],
+        recordedAt: '2026-09-10T03:00:00.000Z',
+      });
+
+      const arg = records.createFromParsed.mock.calls[0][0];
+      expect(arg.recordedAt).toEqual(new Date('2026-09-10T03:00:00.000Z'));
+    });
+
+    it('모델이 수정 툴에 해석할 수 없는 날짜를 주면 그 수정만 실패로 넘긴다.', async () => {
+      mockTurn(
+        toolCall(
+          'call_1',
+          'update_record',
+          JSON.stringify({ recordId: 'r1', recordedAt: 'tomorrow' }),
+        ),
+      );
+
+      await chatAgent.chat({
+        userId: 'u1',
+        messages: [{ role: 'user', content: '그 기록 내일로 옮겨줘' }],
+      });
+
+      expect(records.update).not.toHaveBeenCalled();
+      expect(toolResults().call_1).toBe('실패: 날짜 형식 오류: tomorrow');
     });
   });
 });

@@ -1,17 +1,18 @@
-import { apiFetch, proxyJson, upstreamDown } from '@/lib/server/api';
+import { apiFetch, proxyJson, readJson, upstreamDown } from '@/lib/server/api';
 import { setAuthCookies } from '@/lib/server/auth-cookies';
 import type { AuthResponse } from '@/lib/types';
 import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  const json = await readJson(req);
+  if (!json.ok) return json.response;
 
   let res: Response;
   try {
     res = await apiFetch('/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(json.body),
     });
   } catch (error) {
     return upstreamDown(error, '/auth/login');

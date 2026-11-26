@@ -18,7 +18,7 @@ export class RecordsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: string, dto: CreateRecordDto) {
-    this.assertTypeMatchesItems(dto);
+    this.assertTypeMatchesItems(dto.type, dto);
 
     const data: Prisma.RecordCreateInput = {
       user: { connect: { id: userId } },
@@ -107,6 +107,7 @@ export class RecordsService {
 
   async update(userId: string, id: string, dto: UpdateRecordDto) {
     const existing = await this.findOne(userId, id);
+    this.assertTypeMatchesItems(existing.type, dto);
 
     return this.prisma.$transaction(async (tx) => {
       if (dto.dietItems) {
@@ -164,11 +165,15 @@ export class RecordsService {
     return { ok: true };
   }
 
-  private assertTypeMatchesItems(dto: CreateRecordDto) {
-    if (dto.type === RecordType.DIET && dto.exerciseItems?.length) {
+  /** 식단 기록엔 음식만, 운동 기록엔 운동만 (생성은 요청의 type, 수정은 저장된 type 기준) */
+  private assertTypeMatchesItems(
+    type: RecordType,
+    dto: Pick<CreateRecordDto, 'dietItems' | 'exerciseItems'>,
+  ) {
+    if (type === RecordType.DIET && dto.exerciseItems?.length) {
       throw new BadRequestException('type=DIET 인 record 에 exerciseItems 가 포함될 수 없습니다');
     }
-    if (dto.type === RecordType.EXERCISE && dto.dietItems?.length) {
+    if (type === RecordType.EXERCISE && dto.dietItems?.length) {
       throw new BadRequestException('type=EXERCISE 인 record 에 dietItems 가 포함될 수 없습니다');
     }
   }

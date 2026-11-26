@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppService } from './app.service';
+import { UserThrottlerGuard } from './common/user-throttler.guard';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -38,8 +39,8 @@ import { RecommendationModule } from './recommendation/recommendation.module';
   controllers: [AppController],
   providers: [
     AppService,
-    // 4. ThrottlerGuard 모든 라우터에 자동 적용
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // 4. 요청 횟수 제한 모든 라우터에 자동 적용 (로그인한 요청은 사용자 단위, 아니면 IP 단위)
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
   ],
 })
 export class AppModule {}
