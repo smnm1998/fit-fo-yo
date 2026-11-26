@@ -56,6 +56,9 @@ const STYLES = {
   err: 'text-xs text-danger',
 } as const;
 
+/** api의 입력 상한(RECORD_LIMITS)과 같은 값 - 넘으면 api가 400을 주므로 브라우저에서 먼저 막는다 */
+const LIMITS = { kcal: 10_000, minutes: 1_440 } as const;
+
 const toNum = (s?: string) => (s && s.trim() !== '' ? Number(s) : undefined);
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -202,6 +205,7 @@ export function ManualRecordForm({
               <input
                 type="number"
                 min={0}
+                max={LIMITS.kcal}
                 className={STYLES.input}
                 placeholder="kcal"
                 {...register('calories')}
@@ -214,6 +218,7 @@ export function ManualRecordForm({
               <input
                 type="number"
                 min={0}
+                max={LIMITS.minutes}
                 className={STYLES.input}
                 placeholder="분"
                 {...register('durationMinutes')}
@@ -223,6 +228,7 @@ export function ManualRecordForm({
               <input
                 type="number"
                 min={0}
+                max={LIMITS.kcal}
                 className={STYLES.input}
                 placeholder="kcal"
                 {...register('caloriesBurned')}

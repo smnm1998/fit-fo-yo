@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { apiFetchAuth } from '@/lib/server/api';
 import { getCurrentUser } from '@/lib/server/user';
+import { fetchRecordsInRange } from '@/lib/server/records';
 import {
   currentMonthKST,
   isDayKey,
@@ -13,16 +14,14 @@ import {
 import { weekStreak } from '@/lib/records';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
-import { RecommendationListSchema, RecordPageSchema } from '@/lib/schemas/api';
+import { RecommendationListSchema } from '@/lib/schemas/api';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 
 export const metadata: Metadata = { title: '캘린더' };
 
 async function getRecords(from: string, to: string): Promise<RecordDto[]> {
-  const qs = new URLSearchParams({ from, to, limit: '200' });
-  const res = await apiFetchAuth(`/records?${qs.toString()}`);
-  if (!res.ok) return [];
-  return RecordPageSchema.parse(await res.json()).items;
+  const result = await fetchRecordsInRange(from, to);
+  return result.ok ? result.items : [];
 }
 
 async function getMonthRecommendations(month: string): Promise<RecommendationDto[]> {

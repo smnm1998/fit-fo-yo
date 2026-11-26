@@ -82,10 +82,10 @@ export class AiService {
     rawInput: string;
     fallbackRecordedAt?: string;
   }) {
-    const user = { id: params.userId, isGuest: params.isGuest };
-    await this.quota.assertAvailable(user);
-    const results = await this.parse(params.rawInput, params.fallbackRecordedAt);
-    await this.quota.consume(user);
+    // 게스트는 파싱까지 성공해야 1회로 남음
+    const results = await this.quota.charge({ id: params.userId, isGuest: params.isGuest }, () =>
+      this.parse(params.rawInput, params.fallbackRecordedAt),
+    );
     const valid = results.filter(
       (r): r is Extract<ParsedResult, { kind: 'diet' | 'exercise' }> => r.kind !== 'invalid_domain',
     );

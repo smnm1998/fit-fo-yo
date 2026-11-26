@@ -66,6 +66,23 @@ export function upstreamDown(error: unknown, path: string): NextResponse {
   );
 }
 
+/**
+ * 요청 본문(JSON) 읽기. 깨진 JSON이면 400 응답을 돌려준다
+ * (req.json()을 그냥 부르면 예외가 라우트 밖으로 나가 500이 된다)
+ */
+export async function readJson(
+  req: Request,
+): Promise<{ ok: true; body: unknown } | { ok: false; response: NextResponse }> {
+  try {
+    return { ok: true, body: await req.json() };
+  } catch {
+    return {
+      ok: false,
+      response: NextResponse.json({ message: '요청 형식이 올바르지 않습니다.' }, { status: 400 }),
+    };
+  }
+}
+
 /** 인증 프록시 - 가공 없이 그대로 전달하는 라우트용 (try/catch + 파싱 포함) */
 export async function proxyAuth(path: string, init?: RequestInit): Promise<NextResponse> {
   try {

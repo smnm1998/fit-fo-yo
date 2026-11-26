@@ -52,8 +52,11 @@ export const RecordSchema = z.object({
 
 export const RecordListSchema = z.array(RecordSchema);
 
-/** GET /records (페이지 단위 목록) */
-export const RecordPageSchema = z.object({ items: RecordListSchema });
+/** GET /records (페이지 단위 목록, total = 조건에 맞는 전체 건수) */
+export const RecordPageSchema = z.object({
+  items: RecordListSchema,
+  total: z.number().int().nonnegative(),
+});
 
 export const RecommendationFocusSchema = z.enum(['diet', 'exercise', 'balanced']);
 

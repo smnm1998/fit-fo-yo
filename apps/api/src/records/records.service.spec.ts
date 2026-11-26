@@ -122,3 +122,43 @@ describe('RecordsService.appendDietItems', () => {
     expect(prisma.record.update).not.toHaveBeenCalled();
   });
 });
+
+describe('RecordsService.update - 기록 종류와 항목 종류', () => {
+  let service: RecordsService;
+  let prisma: { record: { findUnique: jest.Mock }; $transaction: jest.Mock };
+
+  beforeEach(async () => {
+    prisma = {
+      record: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'r1', userId: 'u1', type: RecordType.DIET }),
+      },
+      $transaction: jest.fn(),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      providers: [RecordsService, { provide: PrismaService, useValue: prisma }],
+    }).compile();
+
+    service = moduleRef.get(RecordsService);
+  });
+
+  it('식단 기록에 운동 항목을 넣는 수정은 400이고 아무것도 지우지 않는다.', async () => {
+    await expect(
+      service.update('u1', 'r1', { exerciseItems: [{ name: '러닝', durationMinutes: 30 }] }),
+    ).rejects.toThrow(BadRequestException);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('운동 기록에 음식 항목을 넣는 수정도 400이다.', async () => {
+    prisma.record.findUnique.mockResolvedValue({
+      id: 'r1',
+      userId: 'u1',
+      type: RecordType.EXERCISE,
+    });
+
+    await expect(service.update('u1', 'r1', { dietItems: [{ name: '사과' }] })).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, RecordType } from '@fitfoyo/database';
 import { RecordsService } from '../records/records.service';
 import type { UpdateRecordDto } from '../records/dto/update-record.dto';
@@ -18,6 +18,7 @@ import {
 } from './calorie.calculator';
 import { planDiet } from './diet.planner';
 import { dayRangeKST } from './day-context';
+import { toValidDate } from './tool-args';
 
 /** 모델이 파싱한 식단/운동을 칼로리 계산해 기록으로 쓴다 (새로 만들기, 같은 끼니에 덧붙이기, 수정) */
 @Injectable()
@@ -121,7 +122,11 @@ export class RecordWriter {
 
   async update(userId: string, payload: UpdateRecordPayload) {
     const dto: UpdateRecordDto = {};
-    if (payload.recordedAt) dto.recordedAt = payload.recordedAt;
+    if (payload.recordedAt) {
+      const recordedAt = toValidDate(payload.recordedAt);
+      if (!recordedAt) throw new BadRequestException(`날짜 형식 오류: ${payload.recordedAt}`);
+      dto.recordedAt = recordedAt.toISOString();
+    }
     if (payload.dietItems) dto.dietItems = await this.toDietItems(payload.dietItems);
     return this.records.update(userId, payload.recordId, dto);
   }

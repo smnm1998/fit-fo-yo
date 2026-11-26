@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { apiFetchAuth } from '@/lib/server/api';
+import { fetchRecordsInRange } from '@/lib/server/records';
 import { weekRangeAgoKST, weekDayKeysAgoKST } from '@/lib/date';
 import {
   sumRecords,
@@ -11,7 +11,6 @@ import {
 import { StatsView } from '@/components/stats/StatsView';
 import { WeekComparison } from '@/components/stats/WeekComparison';
 import { InsightLead } from '@/components/stats/InsightLead';
-import { RecordPageSchema } from '@/lib/schemas/api';
 import type { RecordDto } from '@/lib/types';
 
 export const metadata: Metadata = { title: '통계' };
@@ -24,12 +23,11 @@ function parseWeek(raw?: string): number {
 async function getRecords(week: number): Promise<RecordDto[]> {
   const from = weekRangeAgoKST(week + 1).from; // 지난주 일요일 00:00
   const to = weekRangeAgoKST(week).to; // 이번주 토요일 23:59
-  const qs = new URLSearchParams({ from, to, limit: '200' });
-  const res = await apiFetchAuth(`/records?${qs.toString()}`);
-  if (!res.ok) {
-    throw new Error(`통계 데이터를 불러오지 못했습니다 (${res.status})`);
+  const result = await fetchRecordsInRange(from, to);
+  if (!result.ok) {
+    throw new Error(`통계 데이터를 불러오지 못했습니다 (${result.response.status})`);
   }
-  return RecordPageSchema.parse(await res.json()).items;
+  return result.items;
 }
 
 export default async function StatsPage({
