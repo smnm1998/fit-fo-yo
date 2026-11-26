@@ -170,6 +170,7 @@ pnpm --filter web dev # 특정 앱만
 
 ```
 fit-foyo/
+├─ .claude/         # AI 작업 지침(CLAUDE.md · rules) · 설정(settings.json) · 훅
 ├─ apps/
 │  ├─ web/          # Next.js (BFF · UI)
 │  └─ api/          # NestJS (도메인 로직 · AI · 인증)
@@ -201,6 +202,10 @@ Access/Refresh **토큰 회전(rotation)** 기반으로 재인증합니다. Refr
 **5. 프론트엔드 성능·UX**
 
 월간 캘린더 전환을 스냅샷 캐시와 인접 월 프리페치로 개선했습니다. prod에서 캐시가 없을 때 월 데이터 요청은 **500~640ms**였고, 이미 받았거나 미리 받아둔 달로 이동할 때는 **요청 없이** 바로 표시됩니다. Optimistic UI(Zustand), 지연 로딩 스켈레톤, 스트리밍(`loading.tsx`)을 적용했습니다.
+
+**6. AI와 함께 개발하는 방식 — 지침을 자동 검사로**
+
+Claude Code로 개발하면서 지킬 규칙을 `.claude/`(CLAUDE.md · rules)에 문서로 두고, 그중 기계로 확인할 수 있는 것은 자동 검사로 옮겼습니다. 비밀 env 파일은 Claude가 읽거나 명령에 쓰기 전에 PreToolUse 훅이 막고(`.claude/hooks`), web이 DB에 직접 닿지 않는 BFF 규칙과 앱 사이 직접 import 금지는 ESLint `no-restricted-imports`로, 접근성 마크업은 `eslint-plugin-jsx-a11y`로 검사합니다. CI는 타입 · lint · 빌드 · 테스트(api · web) · 마이그레이션에 더해, 운영 의존성에 high 이상 취약점이 생기면 실패합니다.
 
 <br/>
 
