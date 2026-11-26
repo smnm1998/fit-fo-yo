@@ -1,4 +1,5 @@
-import type { ApiUser } from '@/lib/types';
+import { z } from 'zod';
+import { AuthResultSchema, OkSchema } from '@/lib/schemas/api';
 
 export class ApiError extends Error {
   constructor(
@@ -19,17 +20,35 @@ function extractMessage(data: unknown): string {
   return '요청을 처리하지 못했습니다.';
 }
 
-export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/** 서버가 약속한 모양과 다른 응답을 보냈을 때 화면에 보여 줄 문구 */
+const CONTRACT_MESSAGE = '서버 응답 형식이 예상과 달라요. 잠시 후 다시 시도해 주세요.';
+
+/**
+ * BFF 호출 + 응답 모양 확인
+ * - 실패 응답(4xx·5xx) → ApiError(그 상태 코드, 서버 메시지)
+ * - 성공인데 모양이 다름 → ApiError(502) + 콘솔에 어긋난 필드
+ */
+export async function request<S extends z.ZodType>(
+  path: string,
+  schema: S,
+  init?: RequestInit,
+): Promise<z.output<S>> {
   const res = await fetch(path, init);
   const data: unknown = await res.json().catch(() => null);
   if (!res.ok) throw new ApiError(res.status, extractMessage(data));
-  return data as T;
+
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    console.error(`[request] ${path} 응답 형식이 다름\n${z.prettifyError(parsed.error)}`);
+    throw new ApiError(502, CONTRACT_MESSAGE);
+  }
+  return parsed.data;
 }
 
-type AuthResult = { user: ApiUser };
+type AuthResult = z.infer<typeof AuthResultSchema>;
 
 export function login(email: string, password: string): Promise<AuthResult> {
-  return request<AuthResult>('/api/auth/login', {
+  return request('/api/auth/login', AuthResultSchema, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -41,7 +60,7 @@ export function signup(input: {
   password: string;
   nickname?: string;
 }): Promise<AuthResult> {
-  return request<AuthResult>('/api/auth/signup', {
+  return request('/api/auth/signup', AuthResultSchema, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
@@ -49,9 +68,9 @@ export function signup(input: {
 }
 
 export function logout(): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
+  return request('/api/auth/logout', OkSchema, { method: 'POST' });
 }
 
 export function fetchMe(): Promise<AuthResult> {
-  return request<AuthResult>('/api/auth/me');
+  return request('/api/auth/me', AuthResultSchema);
 }

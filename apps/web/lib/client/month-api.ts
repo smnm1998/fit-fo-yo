@@ -1,8 +1,9 @@
+import type { z } from 'zod';
 import { request } from '@/lib/client/auth-api';
-import type { RecordDto, RecommendationDto } from '@/lib/types';
+import { MonthDataSchema } from '@/lib/schemas/api';
 
-export type MonthData = { records: RecordDto[]; recommendations: RecommendationDto[] };
+export type MonthData = z.infer<typeof MonthDataSchema>;
 
 export function fetchMonthData(month: string): Promise<MonthData> {
-  return request<MonthData>(`/api/month?month=${month}`);
+  return request(`/api/month?month=${month}`, MonthDataSchema);
 }
