@@ -1,11 +1,29 @@
-export type ApiUser = {
-  id: string;
-  email?: string | null;
-  nickname?: string | null;
-  isGuest: boolean;
-  createdAt: string;
-};
+import type { z } from 'zod';
+import type {
+  AiChatResponseSchema,
+  ApiUserSchema,
+  DailySummarySchema,
+  DietItemSchema,
+  ExerciseItemSchema,
+  HealthProfileSchema,
+  RecommendationFocusSchema,
+  RecommendationSchema,
+  RecordSchema,
+} from '@/lib/schemas/api';
 
+// api 응답 타입은 스키마에서 만든다 → 타입과 실제 검증이 따로 놀지 않게
+export type ApiUser = z.infer<typeof ApiUserSchema>;
+export type DietItem = z.infer<typeof DietItemSchema>;
+export type ExerciseItem = z.infer<typeof ExerciseItemSchema>;
+export type RecordDto = z.infer<typeof RecordSchema>;
+export type RecommendationFocus = z.infer<typeof RecommendationFocusSchema>;
+export type DailySummary = z.infer<typeof DailySummarySchema>;
+export type RecommendationDto = z.infer<typeof RecommendationSchema>;
+export type RecommendationPayload = RecommendationDto['payload'];
+export type HealthProfileDto = z.infer<typeof HealthProfileSchema>;
+export type AiChatResponse = z.infer<typeof AiChatResponseSchema>;
+
+// BFF(서버)에서만 다루는 값 — 브라우저로 내려가지 않는다
 export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
@@ -16,81 +34,4 @@ export type AuthResponse = {
   tokens: AuthTokens;
 };
 
-export type DietItem = {
-  id: string;
-  name: string;
-  mealType?: string | null;
-  quantity?: number | null;
-  unit?: string | null;
-  grams?: number | null;
-  calories?: number | null;
-  carbs?: number | null;
-  protein?: number | null;
-  fat?: number | null;
-  estimated: boolean;
-};
-
-export type ExerciseItem = {
-  id: string;
-  name: string;
-  durationMinutes?: number | null;
-  intensity?: string | null;
-  caloriesBurned?: number | null;
-  estimated: boolean;
-};
-
-export type RecordDto = {
-  id: string;
-  type: 'DIET' | 'EXERCISE';
-  rawInput: string;
-  recordedAt: string;
-  createdAt: string;
-  dietItems: DietItem[];
-  exerciseItems: ExerciseItem[];
-};
-
-export type RecommendationFocus = 'diet' | 'exercise' | 'balanced';
-
-export type DailySummary = {
-  totalCalories: number;
-  carbs: number;
-  protein: number;
-  fat: number;
-  exerciseMinutes: number;
-  caloriesBurned: number;
-  dietCount: number;
-  exerciseCount: number;
-};
-
-export type RecommendationPayload = {
-  message: string;
-  focus: RecommendationFocus;
-  summary: DailySummary;
-};
-
-export type RecommendationDto = {
-  id: string;
-  forDate: string;
-  payload: RecommendationPayload;
-};
-
-export type HealthProfileDto = {
-  id: string;
-  heightCm?: number | null;
-  weightKg?: number | null;
-  conditions?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
 export type AiChatTurn = { role: 'user' | 'assistant'; content: string };
-
-export type AiChatResponse = {
-  reply: string;
-  suggestions: string[];
-  mutations: {
-    created: RecordDto[];
-    updated: RecordDto[];
-    deletedIds: string[];
-  };
-};

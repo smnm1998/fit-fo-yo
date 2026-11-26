@@ -11,6 +11,7 @@ import {
 import { StatsView } from '@/components/stats/StatsView';
 import { WeekComparison } from '@/components/stats/WeekComparison';
 import { InsightLead } from '@/components/stats/InsightLead';
+import { RecordPageSchema } from '@/lib/schemas/api';
 import type { RecordDto } from '@/lib/types';
 
 export const metadata: Metadata = { title: '통계' };
@@ -28,8 +29,7 @@ async function getRecords(week: number): Promise<RecordDto[]> {
   if (!res.ok) {
     throw new Error(`통계 데이터를 불러오지 못했습니다 (${res.status})`);
   }
-  const data = (await res.json()) as { items: RecordDto[] };
-  return data.items;
+  return RecordPageSchema.parse(await res.json()).items;
 }
 
 export default async function StatsPage({

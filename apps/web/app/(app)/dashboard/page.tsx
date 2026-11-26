@@ -13,6 +13,7 @@ import {
 import { weekStreak } from '@/lib/records';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { CalendarWorkspace } from '@/components/dashboard/CalendarWorkspace';
+import { RecommendationListSchema, RecordPageSchema } from '@/lib/schemas/api';
 import type { RecommendationDto, RecordDto } from '@/lib/types';
 
 export const metadata: Metadata = { title: '캘린더' };
@@ -21,8 +22,7 @@ async function getRecords(from: string, to: string): Promise<RecordDto[]> {
   const qs = new URLSearchParams({ from, to, limit: '200' });
   const res = await apiFetchAuth(`/records?${qs.toString()}`);
   if (!res.ok) return [];
-  const data = (await res.json()) as { items: RecordDto[] };
-  return data.items;
+  return RecordPageSchema.parse(await res.json()).items;
 }
 
 async function getMonthRecommendations(month: string): Promise<RecommendationDto[]> {
@@ -30,7 +30,7 @@ async function getMonthRecommendations(month: string): Promise<RecommendationDto
   const qs = new URLSearchParams({ from, to });
   const res = await apiFetchAuth(`/recommendations?${qs.toString()}`);
   if (!res.ok) return [];
-  return (await res.json()) as RecommendationDto[];
+  return RecommendationListSchema.parse(await res.json());
 }
 
 export default async function DashboardPage({
